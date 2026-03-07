@@ -20,6 +20,7 @@ class MatchAdmin(admin.ModelAdmin):
         "team",
         "opponent_name",
         "competition",
+        "venue",
         "home_away",
         "status",
         "team_score",
@@ -32,6 +33,7 @@ class MatchAdmin(admin.ModelAdmin):
         "opponent_name",
         "competition__name",
         "round_label",
+        "venue__name",
     )
 
     # Filters shown in the admin sidebar.
@@ -45,3 +47,34 @@ class MatchAdmin(admin.ModelAdmin):
 
     # Default ordering for the admin list page.
     ordering = ("-match_date", "kickoff_time", "team__name")
+
+    # Group fields into clearer sections in the admin form.
+    fieldsets = (
+        (
+            "Fixture details",
+            {
+                "fields": (
+                    "team",
+                    "season",
+                    "competition",
+                    "opponent_name",
+                    "home_away",
+                    "venue",
+                    "match_date",
+                    "kickoff_time",
+                    "round_label",
+                    "status",
+                )
+            },
+        ),
+        (
+            "Result details",
+            {
+                "fields": (
+                    "team_score",
+                    "opponent_score",
+                )
+            },
+        ),
+    )
+
