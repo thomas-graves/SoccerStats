@@ -18,6 +18,26 @@ class LineupRoleChoices(models.TextChoices):
     STARTER = "starter", "Starter"
     SUBSTITUTE = "substitute", "Substitute"
 
+class PositionLabelChoices(models.TextChoices):
+    """Define the supported matchday position labels."""
+
+    GK = "GK", "GK"
+    CB = "CB", "CB"
+    RB = "RB", "RB"
+    LB = "LB", "LB"
+    RWB = "RWB", "RWB"
+    LWB = "LWB", "LWB"
+    CDM = "CDM", "CDM"
+    CM = "CM", "CM"
+    RM = "RM", "RM"
+    LM = "LM", "LM"
+    CAM = "CAM", "CAM"
+    RW = "RW", "RW"
+    LW = "LW", "LW"
+    CF = "CF", "CF"
+    RS = "RS", "RS"
+    LS = "LS", "LS"
+    ST = "ST", "ST"
 
 class LineupEntry(models.Model):
     """Store a single player's lineup entry for a specific match."""
@@ -40,9 +60,10 @@ class LineupEntry(models.Model):
         help_text="Whether the player was named as a starter or substitute.",
     )
     position_label = models.CharField(
-        max_length=30,
+        max_length=10,
+        choices=PositionLabelChoices.choices,
         blank=True,
-        help_text="Optional position label such as GK, CB, CM, or ST.",
+        help_text="Optional position label for the player's role in this match.",
     )
     shirt_number = models.PositiveIntegerField(
         blank=True,

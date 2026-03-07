@@ -2,12 +2,24 @@
 Models for the competitions app.
 
 This file stores competition-level data such as leagues, cups,
-and other organised tournaments that teams participate in.
+and friendly matches that teams participate in.
+Competitions remain scoped to a club for internal management,
+but can also be linked to an external organising association.
 """
 
 from django.db import models
 
+from associations.models import Association
 from clubs.models import Club
+
+
+class CompetitionTypeChoices(models.TextChoices):
+    """Define the supported competition formats."""
+
+    LEAGUE = "league", "League"
+    CUP = "cup", "Cup"
+    FRIENDLY = "friendly", "Friendly"
+    PRESEASON_FRIENDLY = "preseason_friendly", "Pre-season friendly"
 
 
 class Competition(models.Model):
@@ -17,7 +29,15 @@ class Competition(models.Model):
         Club,
         on_delete=models.CASCADE,
         related_name="competitions",
-        help_text="The club that manages or tracks this competition.",
+        help_text="The club that tracks this competition in the app.",
+    )
+    association = models.ForeignKey(
+        Association,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="competitions",
+        help_text="The external association or organising body that manages this competition.",
     )
     name = models.CharField(
         max_length=100,
@@ -31,6 +51,12 @@ class Competition(models.Model):
     slug = models.SlugField(
         max_length=120,
         help_text="URL-friendly identifier for the competition.",
+    )
+    competition_type = models.CharField(
+        max_length=30,
+        choices=CompetitionTypeChoices.choices,
+        default=CompetitionTypeChoices.LEAGUE,
+        help_text="The format or type of competition.",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -59,5 +85,4 @@ class Competition(models.Model):
     def __str__(self):
         """Return the most human-friendly string representation."""
         return self.short_name or self.name
-    
-    
+

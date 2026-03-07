@@ -18,19 +18,20 @@ class MatchAdmin(admin.ModelAdmin):
         "match_date",
         "kickoff_time",
         "team",
-        "opponent_name",
+        "opponent",
         "competition",
         "venue",
         "home_away",
         "status",
         "team_score",
         "opponent_score",
+        "outcome",
     )
 
     # Fields that can be searched in the admin search bar.
     search_fields = (
         "team__name",
-        "opponent_name",
+        "opponent__name",
         "competition__name",
         "round_label",
         "venue__name",
@@ -43,6 +44,7 @@ class MatchAdmin(admin.ModelAdmin):
         "competition",
         "season",
         "team",
+        "result_resolution",
     )
 
     # Default ordering for the admin list page.
@@ -57,12 +59,14 @@ class MatchAdmin(admin.ModelAdmin):
                     "team",
                     "season",
                     "competition",
-                    "opponent_name",
+                    "opponent",
                     "home_away",
                     "venue",
                     "match_date",
                     "kickoff_time",
                     "round_label",
+                    "match_length_minutes",
+                    "half_length_minutes",
                     "status",
                 )
             },
@@ -73,8 +77,10 @@ class MatchAdmin(admin.ModelAdmin):
                 "fields": (
                     "team_score",
                     "opponent_score",
+                    "result_resolution",
+                    "penalties_team_score",
+                    "penalties_opponent_score",
                 )
             },
         ),
     )
-

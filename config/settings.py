@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'events',
     'stats',
     'standings',
+    'associations',
+    'opponents',
 ]
 
 MIDDLEWARE = [

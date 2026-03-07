@@ -31,7 +31,7 @@ class PlayerMatchStatAdmin(admin.ModelAdmin):
 
     # Fields that can be searched in the admin search bar.
     search_fields = (
-        "match__opponent_name",
+        "match__opponent__name",
         "match__team__name",
         "lineup_entry__registration__player__first_name",
         "lineup_entry__registration__player__last_name",
