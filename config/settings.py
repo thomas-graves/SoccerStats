@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'players',
     'registrations',
     'venues',
+    'matches',
 ]
 
 MIDDLEWARE = [
