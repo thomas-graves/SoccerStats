@@ -8,6 +8,7 @@ or two lineup entries, depending on the event type.
 
 from django.db import models
 from django.core.exceptions import ValidationError
+from coaches.models import MatchCoachAssignment
 from lineups.models import LineupEntry
 from matches.models import Match
 
@@ -75,6 +76,14 @@ class MatchEvent(models.Model):
         related_name="secondary_events",
         help_text="An optional second lineup entry, mainly for substitutions.",
     )
+    match_coach_assignment = models.ForeignKey(
+        MatchCoachAssignment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="events",
+        help_text="Optional match coach assignment linked to this event, mainly for coach cards.",
+    )
     opponent_player_name = models.CharField(
         max_length=100,
         blank=True,
@@ -104,13 +113,18 @@ class MatchEvent(models.Model):
         verbose_name_plural = "Match events"
 
     def clean(self):
-        """Validate that linked lineup entries belong to the same match."""
+        """Validate that linked lineup or coach records belong to the same match."""
         errors = {}
 
         primary_match_id = self.lineup_entry.match_id if self.lineup_entry_id and self.lineup_entry else None
         secondary_match_id = (
             self.related_lineup_entry.match_id
             if self.related_lineup_entry_id and self.related_lineup_entry
+            else None
+        )
+        coach_match_id = (
+            self.match_coach_assignment.match_id
+            if self.match_coach_assignment_id and self.match_coach_assignment
             else None
         )
 
@@ -122,9 +136,29 @@ class MatchEvent(models.Model):
                 "Selected related lineup entry must belong to the same match."
             )
 
+        if self.match_id and coach_match_id and self.match_id != coach_match_id:
+            errors["match_coach_assignment"] = (
+                "Selected match coach assignment must belong to the same match."
+            )
+
         if self.event_type != EventTypeChoices.SUBSTITUTION and self.related_lineup_entry_id:
             errors["related_lineup_entry"] = (
                 "A related lineup entry should only be used for substitutions."
+            )
+
+        if self.match_coach_assignment_id and self.event_type not in {
+            EventTypeChoices.YELLOW_CARD,
+            EventTypeChoices.RED_CARD,
+        }:
+            errors["match_coach_assignment"] = (
+                "A match coach assignment should only be used for yellow or red card events."
+            )
+
+        if self.match_coach_assignment_id and (
+            self.lineup_entry_id or self.related_lineup_entry_id
+        ):
+            errors["match_coach_assignment"] = (
+                "Coach card events should use a match coach assignment instead of lineup entries."
             )
 
         if errors:

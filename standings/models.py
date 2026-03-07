@@ -1,41 +1,30 @@
 """
 Models for the standings app.
 
-This file stores league table and ladder data for a team within a
-competition and season. These records can be entered manually by an
+This file stores league table and ladder data for a competition participant
+within a competition and season. These records can be entered manually by an
 admin or later recalculated from match results if desired.
 """
 
-from django.db import models
 from django.core.exceptions import ValidationError
-from competitions.models import Competition
-from seasons.models import Season
-from teams.models import Team
+from django.db import models
+
+from participants.models import CompetitionParticipant
 
 
 class Standing(models.Model):
-    """Store a team's standing in a competition for a specific season."""
+    """Store a participant's standing in a competition for a specific season."""
 
-    team = models.ForeignKey(
-        Team,
+    participant = models.ForeignKey(
+        CompetitionParticipant,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="standings",
-        help_text="The team that this standing record belongs to.",
-    )
-    season = models.ForeignKey(
-        Season,
-        on_delete=models.CASCADE,
-        related_name="standings",
-        help_text="The season that this standing record belongs to.",
-    )
-    competition = models.ForeignKey(
-        Competition,
-        on_delete=models.CASCADE,
-        related_name="standings",
-        help_text="The competition that this standing record belongs to.",
+        help_text="The competition participant that this standing record belongs to.",
     )
     position = models.PositiveIntegerField(
-        help_text="Current ladder position of the team.",
+        help_text="Current ladder position of the participant.",
     )
     played = models.PositiveIntegerField(
         default=0,
@@ -55,11 +44,11 @@ class Standing(models.Model):
     )
     goals_for = models.PositiveIntegerField(
         default=0,
-        help_text="Total goals scored by the team.",
+        help_text="Total goals scored by the participant.",
     )
     goals_against = models.PositiveIntegerField(
         default=0,
-        help_text="Total goals conceded by the team.",
+        help_text="Total goals conceded by the participant.",
     )
     goal_difference = models.IntegerField(
         default=0,
@@ -79,33 +68,43 @@ class Standing(models.Model):
     )
 
     class Meta:
-        ordering = ["season__name", "competition__name", "position", "team__name"]
+        ordering = [
+            "participant__season__name",
+            "participant__competition__name",
+            "position",
+            "participant__display_name",
+            "participant__id",
+        ]
         verbose_name = "Standing"
         verbose_name_plural = "Standings"
         constraints = [
             models.UniqueConstraint(
-                fields=["team", "season", "competition"],
-                name="unique_team_standing_per_season_competition",
-            ),
-            models.UniqueConstraint(
-                fields=["season", "competition", "position"],
-                name="unique_position_per_season_competition",
+                fields=["participant"],
+                name="unique_standing_per_participant",
             ),
         ]
 
     def clean(self):
-        """Validate that team, season, and competition belong to the same club."""
+        """Validate that position uniqueness is enforced within a competition table."""
         errors = {}
 
-        team_club_id = self.team.club_id if self.team_id else None
-        season_club_id = self.season.club_id if self.season_id else None
-        competition_club_id = self.competition.club_id if self.competition_id else None
+        if self.participant_id:
+            season_id = self.participant.season_id
+            competition_id = self.participant.competition_id
 
-        if team_club_id and season_club_id and team_club_id != season_club_id:
-            errors["season"] = "Selected season must belong to the same club as the team."
+            conflicting_qs = Standing.objects.filter(
+                participant__season_id=season_id,
+                participant__competition_id=competition_id,
+                position=self.position,
+            )
 
-        if team_club_id and competition_club_id and team_club_id != competition_club_id:
-            errors["competition"] = "Selected competition must belong to the same club as the team."
+            if self.pk:
+                conflicting_qs = conflicting_qs.exclude(pk=self.pk)
+
+            if conflicting_qs.exists():
+                errors["position"] = (
+                    "This ladder position is already used in the selected season and competition."
+                )
 
         if errors:
             raise ValidationError(errors)
@@ -117,4 +116,6 @@ class Standing(models.Model):
 
     def __str__(self):
         """Return the most human-friendly string representation."""
-        return f"{self.team} | {self.competition} | Position {self.position}"
+        return f"{self.participant} | Position {self.position}"
+    
+    

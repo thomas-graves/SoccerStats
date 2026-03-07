@@ -22,6 +22,7 @@ class MatchEventAdmin(admin.ModelAdmin):
         "stoppage_minute",
         "lineup_entry",
         "related_lineup_entry",
+        "match_coach_assignment",
         "sort_order",
         "created_at",
         "updated_at",
@@ -35,6 +36,8 @@ class MatchEventAdmin(admin.ModelAdmin):
         "lineup_entry__registration__player__last_name",
         "related_lineup_entry__registration__player__first_name",
         "related_lineup_entry__registration__player__last_name",
+        "match_coach_assignment__coach_registration__coach__first_name",
+        "match_coach_assignment__coach_registration__coach__last_name",
         "opponent_player_name",
         "notes",
     )

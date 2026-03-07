@@ -16,9 +16,7 @@ class StandingAdmin(admin.ModelAdmin):
     # Columns shown in the admin list view.
     list_display = (
         "position",
-        "team",
-        "competition",
-        "season",
+        "participant",
         "played",
         "won",
         "drawn",
@@ -33,21 +31,22 @@ class StandingAdmin(admin.ModelAdmin):
 
     # Fields that can be searched in the admin search bar.
     search_fields = (
-        "team__name",
-        "competition__name",
-        "season__name",
+        "participant__display_name",
+        "participant__team__name",
+        "participant__opponent_team__name",
+        "participant__competition__name",
+        "participant__season__name",
     )
 
     # Filters shown in the admin sidebar.
     list_filter = (
-        "season",
-        "competition",
-        "team",
+        "participant__season",
+        "participant__competition",
     )
 
     # Default ordering for the admin list page.
     ordering = (
-        "season__name",
-        "competition__name",
+        "participant__season__name",
+        "participant__competition__name",
         "position",
     )
