@@ -7,7 +7,7 @@ and basic result information.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from competitions.models import Competition
 from seasons.models import Season
 from teams.models import Team
@@ -111,6 +111,32 @@ class Match(models.Model):
         ordering = ["-match_date", "kickoff_time", "team__name", "opponent_name"]
         verbose_name = "Match"
         verbose_name_plural = "Matches"
+
+    def clean(self):
+        """Validate that linked records belong to a consistent club context."""
+        errors = {}
+
+        team_club_id = self.team.club_id if self.team_id else None
+        season_club_id = self.season.club_id if self.season_id else None
+        competition_club_id = self.competition.club_id if self.competition_id else None
+        venue_club_id = self.venue.club_id if self.venue_id and self.venue else None
+
+        if team_club_id and season_club_id and team_club_id != season_club_id:
+            errors["season"] = "Selected season must belong to the same club as the team."
+
+        if team_club_id and competition_club_id and team_club_id != competition_club_id:
+            errors["competition"] = "Selected competition must belong to the same club as the team."
+
+        if team_club_id and venue_club_id and team_club_id != venue_club_id:
+            errors["venue"] = "Selected venue must belong to the same club as the team."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the match."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""

@@ -7,7 +7,7 @@ and season-based player statistics.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from players.models import Player
 from seasons.models import Season
 from teams.models import Team
@@ -72,6 +72,28 @@ class PlayerRegistration(models.Model):
                 name="unique_player_team_season_registration",
             ),
         ]
+
+    def clean(self):
+        """Validate that player, team, and season belong to the same club."""
+        errors = {}
+
+        player_club_id = self.player.club_id if self.player_id else None
+        team_club_id = self.team.club_id if self.team_id else None
+        season_club_id = self.season.club_id if self.season_id else None
+
+        if player_club_id and team_club_id and player_club_id != team_club_id:
+            errors["team"] = "Selected team must belong to the same club as the player."
+
+        if player_club_id and season_club_id and player_club_id != season_club_id:
+            errors["season"] = "Selected season must belong to the same club as the player."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the registration."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""

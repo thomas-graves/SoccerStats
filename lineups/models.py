@@ -7,7 +7,7 @@ captures whether they started or were named on the bench.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from matches.models import Match
 from registrations.models import PlayerRegistration
 
@@ -76,6 +76,29 @@ class LineupEntry(models.Model):
                 name="unique_registration_per_match_lineup",
             ),
         ]
+
+    def clean(self):
+        """Validate that the registration matches the match team and season."""
+        errors = {}
+
+        match_team_id = self.match.team_id if self.match_id else None
+        match_season_id = self.match.season_id if self.match_id else None
+        registration_team_id = self.registration.team_id if self.registration_id else None
+        registration_season_id = self.registration.season_id if self.registration_id else None
+
+        if match_team_id and registration_team_id and match_team_id != registration_team_id:
+            errors["registration"] = "Selected registration must belong to the same team as the match."
+
+        if match_season_id and registration_season_id and match_season_id != registration_season_id:
+            errors["match"] = "Selected registration must belong to the same season as the match."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the lineup entry."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""

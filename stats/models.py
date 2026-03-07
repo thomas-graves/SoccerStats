@@ -7,7 +7,7 @@ performance data to be recorded in a consistent way.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from lineups.models import LineupEntry
 from matches.models import Match
 
@@ -82,6 +82,23 @@ class PlayerMatchStat(models.Model):
                 name="unique_player_stat_per_match_lineup",
             ),
         ]
+
+    def clean(self):
+        """Validate that the lineup entry belongs to the same match."""
+        errors = {}
+
+        lineup_match_id = self.lineup_entry.match_id if self.lineup_entry_id else None
+
+        if self.match_id and lineup_match_id and self.match_id != lineup_match_id:
+            errors["lineup_entry"] = "Selected lineup entry must belong to the same match."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the stat record."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""

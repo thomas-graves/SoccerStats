@@ -7,7 +7,7 @@ or two lineup entries, depending on the event type.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from lineups.models import LineupEntry
 from matches.models import Match
 
@@ -102,6 +102,38 @@ class MatchEvent(models.Model):
         ordering = ["match__match_date", "minute", "stoppage_minute", "sort_order", "id"]
         verbose_name = "Match event"
         verbose_name_plural = "Match events"
+
+    def clean(self):
+        """Validate that linked lineup entries belong to the same match."""
+        errors = {}
+
+        primary_match_id = self.lineup_entry.match_id if self.lineup_entry_id and self.lineup_entry else None
+        secondary_match_id = (
+            self.related_lineup_entry.match_id
+            if self.related_lineup_entry_id and self.related_lineup_entry
+            else None
+        )
+
+        if self.match_id and primary_match_id and self.match_id != primary_match_id:
+            errors["lineup_entry"] = "Selected lineup entry must belong to the same match."
+
+        if self.match_id and secondary_match_id and self.match_id != secondary_match_id:
+            errors["related_lineup_entry"] = (
+                "Selected related lineup entry must belong to the same match."
+            )
+
+        if self.event_type != EventTypeChoices.SUBSTITUTION and self.related_lineup_entry_id:
+            errors["related_lineup_entry"] = (
+                "A related lineup entry should only be used for substitutions."
+            )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the event."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""

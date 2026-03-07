@@ -7,7 +7,7 @@ admin or later recalculated from match results if desired.
 """
 
 from django.db import models
-
+from django.core.exceptions import ValidationError
 from competitions.models import Competition
 from seasons.models import Season
 from teams.models import Team
@@ -92,6 +92,28 @@ class Standing(models.Model):
                 name="unique_position_per_season_competition",
             ),
         ]
+
+    def clean(self):
+        """Validate that team, season, and competition belong to the same club."""
+        errors = {}
+
+        team_club_id = self.team.club_id if self.team_id else None
+        season_club_id = self.season.club_id if self.season_id else None
+        competition_club_id = self.competition.club_id if self.competition_id else None
+
+        if team_club_id and season_club_id and team_club_id != season_club_id:
+            errors["season"] = "Selected season must belong to the same club as the team."
+
+        if team_club_id and competition_club_id and team_club_id != competition_club_id:
+            errors["competition"] = "Selected competition must belong to the same club as the team."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """Run full model validation before saving the standing."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """Return the most human-friendly string representation."""
