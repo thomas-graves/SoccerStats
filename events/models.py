@@ -201,18 +201,17 @@ class EventQualifierValueType(models.TextChoices):
 
 class EventLinkType(models.TextChoices):
     """
-    Relationship type between two events.
+    Football-specific relationship types between two MatchEvent rows.
 
-    This lets us explicitly model event chains such as:
-    - key pass -> resulted in -> shot
-    - shot -> resulted in -> goal
-    - foul committed -> resulted in -> yellow card
+    These are intentionally domain-specific so that links are easier to
+    understand in admin and easier to use for future stat derivation.
     """
-    CAUSED_BY = "caused_by", _("Caused by")
-    RESULTED_IN = "resulted_in", _("Resulted in")
-    ASSISTED_BY = "assisted_by", _("Assisted by")
-    PRECEDED_BY = "preceded_by", _("Preceded by")
-    FOLLOWED_BY = "followed_by", _("Followed by")
+
+    CREATED_SHOT = "created_shot", _("Created shot")
+    RESULTED_IN_GOAL = "resulted_in_goal", _("Resulted in goal")
+    RESULTED_IN_SAVE = "resulted_in_save", _("Resulted in save")
+    RESULTED_IN_CARD = "resulted_in_card", _("Resulted in card")
+    REBOUND_FROM = "rebound_from", _("Rebound from")
     RELATED = "related", _("Related")
 
 
@@ -346,7 +345,7 @@ class MatchEvent(models.Model):
 
     def clean(self):
         """
-        Model validation for event timing, team consistency, and pitch coordinates.
+        Model validation for event timing, pitch coordinates, and basic event semantics.
         """
         errors = {}
 
@@ -358,6 +357,48 @@ class MatchEvent(models.Model):
         # Also ensure values stay within the 0..100 pitch percentage range.
         self._validate_point_pair("start_x", "start_y", errors)
         self._validate_point_pair("end_x", "end_y", errors)
+
+        # Event-type-specific participant validation.
+        #
+        # These checks are intentionally modest for now. They enforce the most
+        # important semantic rules without making the event model too rigid
+        # during early development.
+        #
+        # Note:
+        # - These checks only run once the MatchEvent already exists in the database,
+        #   because unsaved events do not yet have related participant rows.
+        # - Inline admin saves the parent event before saving inline participants,
+        #   so this approach is still safe for normal admin editing after creation.
+        if self.pk:
+            participant_roles = set(self.participants.values_list("role", flat=True))
+
+            # Shots and own goals should always identify the main actor.
+            if self.event_type in {EventType.SHOT, EventType.OWN_GOAL}:
+                if EventParticipantRole.ACTOR not in participant_roles:
+                    errors["event_type"] = _(
+                        "Shot and own-goal events must include an actor participant."
+                    )
+
+            # Card events should identify who received the card.
+            if self.event_type == EventType.CARD:
+                if EventParticipantRole.CARD_RECEIVER not in participant_roles:
+                    errors["event_type"] = _(
+                        "Card events must include a card_receiver participant."
+                    )
+
+            # Substitutions should record both the player going off and on.
+            if self.event_type == EventType.SUBSTITUTION:
+                missing_roles = []
+
+                if EventParticipantRole.SUBBED_OFF not in participant_roles:
+                    missing_roles.append("subbed_off")
+                if EventParticipantRole.SUBBED_ON not in participant_roles:
+                    missing_roles.append("subbed_on")
+
+                if missing_roles:
+                    errors["event_type"] = _(
+                        "Substitution events must include both subbed_off and subbed_on participants."
+                    )
 
         if errors:
             raise ValidationError(errors)
