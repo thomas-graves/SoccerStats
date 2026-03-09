@@ -202,22 +202,15 @@ class MatchEvent(models.Model):
     )
 
     # The top-level event category.
-    # Temporarily nullable for the schema transition migration.
-    # We will tighten this later once the old rows have been migrated or cleaned.
     event_type = models.CharField(
         max_length=32,
         choices=EventType.choices,
-        null=True,
-        blank=True,
     )
 
     # Which phase of the match the event occurred in.
-    # Temporarily nullable for the schema transition migration.
     period = models.CharField(
         max_length=4,
         choices=EventPeriod.choices,
-        null=True,
-        blank=True,
     )
 
     # Example:
@@ -233,10 +226,8 @@ class MatchEvent(models.Model):
 
     # Tie-break ordering when multiple events share the same timestamp.
     # Example: two events both logged at 67:15.
-    # Temporarily nullable for the schema transition migration.
     sequence_index = models.PositiveIntegerField(
-        null=True,
-        blank=True,
+        default=0,
         help_text=_("Tie-break ordering when multiple events share the same timestamp."),
     )
 
