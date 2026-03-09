@@ -14,6 +14,8 @@ from django.utils.translation import gettext_lazy as _
 MATCH_MODEL = "matches.Match"
 TEAM_MODEL = "teams.Team"
 PLAYER_MODEL = "players.Player"
+LINEUP_ENTRY_MODEL = "lineups.LineupEntry"
+MATCH_COACH_ASSIGNMENT_MODEL = "coaches.MatchCoachAssignment"
 
 
 class EventPeriod(models.TextChoices):
@@ -34,25 +36,50 @@ class EventPeriod(models.TextChoices):
 
 class EventOutcome(models.TextChoices):
     """
-    A lightweight outcome flag for events where success/failure matters.
+    Richer event outcomes used to support stat derivation and clearer event semantics.
 
-    Examples:
-    - dribble: success / failure
-    - tackle: success / failure
-    - shot: success / failure or neutral depending on your workflow
-    - kick_off: usually neutral
+    Not every event type will use every outcome, but having a shared controlled
+    vocabulary makes downstream logic much simpler.
     """
-    SUCCESS = "success", _("Success")
-    FAILURE = "failure", _("Failure")
+
+    COMPLETED = "completed", _("Completed")
+    INCOMPLETE = "incomplete", _("Incomplete")
+    SUCCESSFUL = "successful", _("Successful")
+    UNSUCCESSFUL = "unsuccessful", _("Unsuccessful")
+    WON = "won", _("Won")
+    LOST = "lost", _("Lost")
+    SCORED = "scored", _("Scored")
+    SAVED = "saved", _("Saved")
+    BLOCKED = "blocked", _("Blocked")
+    OFF_TARGET = "off_target", _("Off target")
+    NEUTRAL = "neutral", _("Neutral")
+
+
+class EventTeamSide(models.TextChoices):
+    """
+    Side attribution for a match event.
+
+    This is needed because events may belong to:
+    - the club side
+    - the opponent side
+    - neither side directly, for neutral control events
+    """
+
+    CLUB = "club", _("Club")
+    OPPONENT = "opponent", _("Opponent")
     NEUTRAL = "neutral", _("Neutral")
 
 
 class EventType(models.TextChoices):
     """
-    Canonical list of supported event types.
+    Canonical list of supported core event types.
 
-    These are the top-level event categories that admins will select
-    when logging a match event.
+    These are intentionally the main football actions, not every possible
+    subtype or derived concept. More detailed meaning is stored through:
+    - qualifiers
+    - participants
+    - event links
+    - derived stats
     """
 
     # Match control
@@ -66,47 +93,32 @@ class EventType(models.TextChoices):
     PENALTIES_END = "penalties_end", _("Penalties end")
 
     # Ball progression
+    PASS = "pass", _("Pass")
     CARRY = "carry", _("Carry")
     DRIBBLE = "dribble", _("Dribble")
-    CROSS = "cross", _("Cross")
-    THROUGH_BALL = "through_ball", _("Through ball")
-    LONG_BALL = "long_ball", _("Long ball")
 
     # Attacking actions
     SHOT = "shot", _("Shot")
-    GOAL = "goal", _("Goal")
     OWN_GOAL = "own_goal", _("Own goal")
-    CHANCE_CREATED = "chance_created", _("Chance created")
-    ASSIST = "assist", _("Assist")
-    KEY_PASS = "key_pass", _("Key pass")
 
     # Defensive actions
     TACKLE = "tackle", _("Tackle")
     INTERCEPTION = "interception", _("Interception")
     CLEARANCE = "clearance", _("Clearance")
     BLOCK = "block", _("Block")
-    RECOVERY = "recovery", _("Recovery")
+    BALL_RECOVERY = "ball_recovery", _("Ball recovery")
     AERIAL_DUEL = "aerial_duel", _("Aerial duel")
-    GROUND_DUEL = "ground_duel", _("Ground duel")
 
     # Goalkeeping
     SAVE = "save", _("Save")
     CLAIM = "claim", _("Claim")
-    PUNCH = "punch", _("Punch")
-    SWEEP = "sweep", _("Sweep")
-    DISTRIBUTION = "distribution", _("Distribution")
 
     # Discipline / stoppages
     FOUL_COMMITTED = "foul_committed", _("Foul committed")
     FOUL_WON = "foul_won", _("Foul won")
     OFFSIDE = "offside", _("Offside")
-    YELLOW_CARD = "yellow_card", _("Yellow card")
-    RED_CARD = "red_card", _("Red card")
-    SECOND_YELLOW_RED = "second_yellow_red", _("Second yellow then red")
+    CARD = "card", _("Card")
     SUBSTITUTION = "substitution", _("Substitution")
-
-    # Restarts
-    CORNER_TAKEN = "corner_taken", _("Corner taken")
 
 
 class EventParticipantRole(models.TextChoices):
@@ -128,6 +140,45 @@ class EventParticipantRole(models.TextChoices):
     CARD_RECEIVER = "card_receiver", _("Card receiver")
     SUBBED_ON = "subbed_on", _("Subbed on")
     SUBBED_OFF = "subbed_off", _("Subbed off")
+
+
+class EventQualifierKey(models.TextChoices):
+    """
+    Controlled qualifier keys for structured event metadata.
+
+    These keys define the kinds of metadata that can be attached to events
+    without bloating the core MatchEvent table.
+    """
+
+    # General
+    BODY_PART = "body_part", _("Body part")
+    UNDER_PRESSURE = "under_pressure", _("Under pressure")
+    BIG_CHANCE = "big_chance", _("Big chance")
+
+    # Passing
+    PASS_LENGTH = "pass_length", _("Pass length")
+    PASS_PROFILE = "pass_profile", _("Pass profile")
+    PASS_HEIGHT = "pass_height", _("Pass height")
+    PASS_DIRECTION = "pass_direction", _("Pass direction")
+    PROGRESSIVE = "progressive", _("Progressive")
+
+    # Restarts / set pieces
+    RESTART_TYPE = "restart_type", _("Restart type")
+    RESTART_SIDE = "restart_side", _("Restart side")
+    FREE_KICK_PROFILE = "free_kick_profile", _("Free kick profile")
+
+    # Shooting
+    SHOT_ZONE = "shot_zone", _("Shot zone")
+    SHOT_ON_TARGET = "shot_on_target", _("Shot on target")
+    SHOT_TARGET_HORIZONTAL = "shot_target_horizontal", _("Shot target horizontal")
+    SHOT_TARGET_VERTICAL = "shot_target_vertical", _("Shot target vertical")
+    HIT_WOODWORK = "hit_woodwork", _("Hit woodwork")
+
+    # Tackles / fouls / cards
+    TACKLE_PROFILE = "tackle_profile", _("Tackle profile")
+    FOUL_PROFILE = "foul_profile", _("Foul profile")
+    CARD_TYPE = "card_type", _("Card type")
+    CARD_REASON = "card_reason", _("Card reason")
 
 
 class EventQualifierValueType(models.TextChoices):
@@ -171,11 +222,11 @@ class MatchEvent(models.Model):
 
     This model is intentionally lean. It stores:
     - which match the event belongs to
-    - which team the event is attributed to
+    - which side the event is attributed to
     - what happened
     - when it happened
     - where it happened on the pitch
-    - a broad success/failure/neutral outcome
+    - a broad structured outcome
 
     More detailed context is stored in:
     - MatchEventParticipant
@@ -190,15 +241,20 @@ class MatchEvent(models.Model):
         related_name="events",
     )
 
-    # The team this event is attributed to.
-    # This is useful for deriving team stats later.
-    team = models.ForeignKey(
-        TEAM_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="match_events",
-        help_text=_("Team the event is attributed to for stat derivation."),
+    # Which side the event belongs to.
+    #
+    # We store side explicitly because match events may belong to:
+    # - the club side
+    # - the opponent side
+    # - neither side directly for neutral control events
+    #
+    # The club team itself is already available via match.team, so storing
+    # an internal Team foreign key here is no longer the right primary marker.
+    team_side = models.CharField(
+        max_length=10,
+        choices=EventTeamSide.choices,
+        default=EventTeamSide.CLUB,
+        help_text=_("Which side this event is attributed to."),
     )
 
     # The top-level event category.
@@ -274,10 +330,10 @@ class MatchEvent(models.Model):
                 fields=["match", "event_type"],
                 name="event_match_type_idx",
             ),
-            # Optimises team-based event queries within a match.
+            # Optimises side-based event queries within a match.
             models.Index(
-                fields=["match", "team"],
-                name="event_match_team_idx",
+                fields=["match", "team_side"],
+                name="event_match_side_idx",
             ),
         ]
 
@@ -293,11 +349,6 @@ class MatchEvent(models.Model):
         Model validation for event timing, team consistency, and pitch coordinates.
         """
         errors = {}
-
-        # If a team is supplied, it must match the team attached to the parent match.
-        # This keeps event data scoped to the correct club side.
-        if self.team_id and self.match_id and self.team_id != self.match.team_id:
-            errors["team"] = _("Selected team must match the team attached to the match.")
 
         # Seconds must be in normal clock range.
         if self.second > 59:
@@ -344,14 +395,16 @@ class MatchEventParticipant(models.Model):
     """
     Flexible participant model for an event.
 
-    This replaces rigid event fields such as:
-    - player
-    - assister
-    - goalkeeper
-    - fouled_player
-    - substituted_on / substituted_off
+    This model stores the people involved in a match event using match-context
+    references wherever possible.
 
-    Instead, each participant gets a role.
+    Current participant sources:
+    - lineup_entry for club-side players involved in the match
+    - match_coach_assignment for coaches involved in the match
+    - display_name as a fallback for opponent or unknown participants
+
+    This keeps the event system aligned to the actual match context while still
+    allowing incomplete or opponent-side data to be recorded.
     """
 
     # The event this participant belongs to.
@@ -367,32 +420,40 @@ class MatchEventParticipant(models.Model):
         choices=EventParticipantRole.choices,
     )
 
-    # Optional linked team and player.
-    # team can be useful even when player is not linked.
-    team = models.ForeignKey(
-        TEAM_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="+",
-    )
-    player = models.ForeignKey(
-        PLAYER_MODEL,
+    # Club-side player reference for this specific match.
+    lineup_entry = models.ForeignKey(
+        LINEUP_ENTRY_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="event_participations",
+        help_text=_("Use for club-side player participants tied to this specific match."),
     )
 
-    # Fallback display name when a participant is not linked to a Player row.
-    # This is particularly useful for opposition players not yet in the database.
+    # Coach reference for this specific match.
+    match_coach_assignment = models.ForeignKey(
+        MATCH_COACH_ASSIGNMENT_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_participations",
+        help_text=_("Use for coach participants tied to this specific match."),
+    )
+
+    # Fallback display name when the participant is not linked to a club lineup
+    # entry or coach assignment. This is particularly useful for:
+    # - opponent players
+    # - unknown participants such as 'Unknown #0'
     display_name = models.CharField(
         max_length=120,
         blank=True,
-        help_text=_("Use when you want to record a participant without linking a Player row."),
+        help_text=_(
+            "Use when you want to record an opponent or unknown participant "
+            "without linking a club-side lineup or coach record."
+        ),
     )
 
-    # Optional shirt number, useful for manual entry and disambiguation.
+    # Optional shirt number, useful for opponent players and unknown participants.
     shirt_number = models.PositiveSmallIntegerField(null=True, blank=True)
 
     # Allows more than one participant for the same role on an event.
@@ -409,8 +470,13 @@ class MatchEventParticipant(models.Model):
         indexes = [
             # Optimises participant lookups by event and role.
             models.Index(fields=["event", "role"], name="event_part_role_idx"),
-            # Optimises reverse queries from a player to all linked event participations.
-            models.Index(fields=["player"], name="event_part_player_idx"),
+            # Optimises reverse queries from a lineup entry to all linked event participations.
+            models.Index(fields=["lineup_entry"], name="event_part_lineup_idx"),
+            # Optimises reverse queries from a match coach assignment to all linked event participations.
+            models.Index(
+                fields=["match_coach_assignment"],
+                name="event_part_coach_idx",
+            ),
         ]
         constraints = [
             # Prevents duplicate sequence positions for the same role on the same event.
@@ -421,34 +487,58 @@ class MatchEventParticipant(models.Model):
         ]
 
     def __str__(self):
-        label = self.display_name or (str(self.player) if self.player_id else "Unlinked participant")
-        return f"{self.role}: {label}"
+        """
+        Return the most helpful participant label for admin and debugging.
+        """
+        if self.lineup_entry_id:
+            return f"{self.role}: {self.lineup_entry.registration.player}"
+        if self.match_coach_assignment_id:
+            return f"{self.role}: {self.match_coach_assignment.coach_registration.coach}"
+        if self.display_name:
+            return f"{self.role}: {self.display_name}"
+        return f"{self.role}: Unlinked participant"
 
     def clean(self):
         """
-        Validate that a participant is identifiable and consistent with the event.
+        Validate that the participant is identifiable and belongs to the same match.
 
         Rules:
-        - provide either a linked player or a display name
-        - if both team and event.match team are present, they must match
-        - if both player and team are present, the player's club must match the team's club
+        - exactly one of lineup_entry, match_coach_assignment, or display_name
+          should be used as the participant source
+        - lineup_entry must belong to the same match as the event
+        - match_coach_assignment must belong to the same match as the event
         """
         errors = {}
 
-        # Require at least one way of identifying the participant.
-        if not self.player and not self.display_name:
-            errors["player"] = _("Provide either a linked player or a display name.")
-            errors["display_name"] = _("Provide either a linked player or a display name.")
+        source_count = sum(
+            [
+                bool(self.lineup_entry_id),
+                bool(self.match_coach_assignment_id),
+                bool(self.display_name),
+            ]
+        )
 
-        # If a participant team is supplied, keep it aligned to the match team.
-        # This prevents event participants from being attached to the wrong club team.
-        if self.team_id and self.event_id and self.team_id != self.event.match.team_id:
-            errors["team"] = _("Selected team must match the team attached to the event's match.")
+        if source_count == 0:
+            errors["display_name"] = _(
+                "Provide a lineup entry, a match coach assignment, or a display name."
+            )
 
-        # If both a linked player and team are supplied, they must belong to the same club.
-        # This is the strongest cross-model validation we can enforce with the current schema.
-        if self.player_id and self.team_id and self.player.club_id != self.team.club_id:
-            errors["player"] = _("Linked player must belong to the same club as the selected team.")
+        if source_count > 1:
+            errors["display_name"] = _(
+                "Use only one participant source: lineup entry, match coach assignment, or display name."
+            )
+
+        if self.lineup_entry_id and self.event_id:
+            if self.lineup_entry.match_id != self.event.match_id:
+                errors["lineup_entry"] = _(
+                    "Selected lineup entry must belong to the same match as the event."
+                )
+
+        if self.match_coach_assignment_id and self.event_id:
+            if self.match_coach_assignment.match_id != self.event.match_id:
+                errors["match_coach_assignment"] = _(
+                    "Selected match coach assignment must belong to the same match as the event."
+                )
 
         if errors:
             raise ValidationError(errors)
@@ -485,10 +575,14 @@ class MatchEventQualifier(models.Model):
         related_name="qualifiers",
     )
 
-    # Machine-readable key.
-    key = models.SlugField(
-        max_length=64,
-        help_text=_("Canonical machine-readable key, e.g. body_part or shot_on_target."),
+    # Controlled qualifier key.
+    #
+    # We use a fixed enum here so qualifiers stay consistent across matches,
+    # which is important for reliable stat derivation later.
+    key = models.CharField(
+        max_length=32,
+        choices=EventQualifierKey.choices,
+        help_text=_("Controlled qualifier key for this event metadata row."),
     )
 
     # Indicates which one of the typed value fields should be populated.

@@ -45,7 +45,7 @@ class MatchEventParticipantInline(admin.TabularInline):
     extra = 0
 
     # Make the related player lookup easier to use.
-    autocomplete_fields = ["player", "team"]
+    autocomplete_fields = ["lineup_entry", "match_coach_assignment"]
 
     # Show a direct link to edit an existing inline object if needed.
     show_change_link = True
@@ -53,8 +53,8 @@ class MatchEventParticipantInline(admin.TabularInline):
     # Keep the inline columns focused on match-entry needs.
     fields = (
         "role",
-        "team",
-        "player",
+        "lineup_entry",
+        "match_coach_assignment",
         "display_name",
         "shirt_number",
         "sequence_index",
@@ -115,7 +115,7 @@ class MatchEventAdmin(admin.ModelAdmin):
     # Helpful columns for browsing a match timeline in admin.
     list_display = (
         "match",
-        "team",
+        "team_side",
         "event_type",
         "period",
         "minute",
@@ -140,7 +140,7 @@ class MatchEventAdmin(admin.ModelAdmin):
         "event_type",
         "period",
         "outcome",
-        "team",
+        "team_side",
         "match__season",
         "match__competition",
     )
@@ -156,8 +156,8 @@ class MatchEventAdmin(admin.ModelAdmin):
         "id",
     )
 
-    # Make the foreign key selection smoother for admins.
-    autocomplete_fields = ["match", "team"]
+    # Match remains a related lookup, but team is now represented by team_side.
+    autocomplete_fields = ["match"]
 
     # Group the form into clearer sections for event entry.
     fieldsets = (
@@ -166,7 +166,7 @@ class MatchEventAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "match",
-                    "team",
+                    "team_side",
                     "event_type",
                     "outcome",
                 )
@@ -213,8 +213,8 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
     list_display = (
         "event",
         "role",
-        "team",
-        "player",
+        "lineup_entry",
+        "match_coach_assignment",
         "display_name",
         "shirt_number",
         "sequence_index",
@@ -226,14 +226,15 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "event__match__team__name",
         "event__match__opponent__name",
         "role",
-        "player__first_name",
-        "player__last_name",
+        "lineup_entry__registration__player__first_name",
+        "lineup_entry__registration__player__last_name",
+        "match_coach_assignment__coach_registration__coach__first_name",
+        "match_coach_assignment__coach_registration__coach__last_name",
         "display_name",
     )
 
     list_filter = (
         "role",
-        "team",
         "event__match__season",
         "event__match__competition",
     )
@@ -248,7 +249,7 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "id",
     )
 
-    autocomplete_fields = ["event", "team", "player"]
+    autocomplete_fields = ["event", "lineup_entry", "match_coach_assignment"]
 
 
 @admin.register(MatchEventQualifier)
@@ -327,3 +328,5 @@ class MatchEventLinkAdmin(admin.ModelAdmin):
     )
 
     autocomplete_fields = ["from_event", "to_event"]
+
+
