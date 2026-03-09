@@ -299,9 +299,14 @@ class MatchEvent(models.Model):
 
     def clean(self):
         """
-        Model validation for event timing and pitch coordinates.
+        Model validation for event timing, team consistency, and pitch coordinates.
         """
         errors = {}
+
+        # If a team is supplied, it must match the team attached to the parent match.
+        # This keeps event data scoped to the correct club side.
+        if self.team_id and self.match_id and self.team_id != self.match.team_id:
+            errors["team"] = _("Selected team must match the team attached to the match.")
 
         # Seconds must be in normal clock range.
         if self.second > 59:
@@ -335,6 +340,13 @@ class MatchEvent(models.Model):
             errors[x_field] = _("Coordinate must be between 0 and 100.")
         if y_value is not None and not (0 <= float(y_value) <= 100):
             errors[y_field] = _("Coordinate must be between 0 and 100.")
+
+    def save(self, *args, **kwargs):
+        """
+        Run full model validation before saving the event.
+        """
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class MatchEventParticipant(models.Model):
@@ -423,12 +435,39 @@ class MatchEventParticipant(models.Model):
 
     def clean(self):
         """
-        Require at least one way of identifying the participant.
+        Validate that a participant is identifiable and consistent with the event.
+
+        Rules:
+        - provide either a linked player or a display name
+        - if both team and event.match team are present, they must match
+        - if both player and team are present, the player's club must match the team's club
         """
+        errors = {}
+
+        # Require at least one way of identifying the participant.
         if not self.player and not self.display_name:
-            raise ValidationError(
-                {"player": _("Provide either a linked player or a display name.")}
-            )
+            errors["player"] = _("Provide either a linked player or a display name.")
+            errors["display_name"] = _("Provide either a linked player or a display name.")
+
+        # If a participant team is supplied, keep it aligned to the match team.
+        # This prevents event participants from being attached to the wrong club team.
+        if self.team_id and self.event_id and self.team_id != self.event.match.team_id:
+            errors["team"] = _("Selected team must match the team attached to the event's match.")
+
+        # If both a linked player and team are supplied, they must belong to the same club.
+        # This is the strongest cross-model validation we can enforce with the current schema.
+        if self.player_id and self.team_id and self.player.club_id != self.team.club_id:
+            errors["player"] = _("Linked player must belong to the same club as the selected team.")
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """
+        Run full model validation before saving the participant.
+        """
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class MatchEventQualifier(models.Model):
@@ -535,6 +574,11 @@ class MatchEventQualifier(models.Model):
         """
         Ensure exactly one typed value field is populated,
         and that it matches value_type.
+
+        Additional consistency rules:
+        - team_value must match the team attached to the event's match
+        - event_value must belong to the same match as the parent event
+        - if both player_value and team_value are supplied, they must belong to the same club
         """
         provided_values = {
             EventQualifierValueType.TEXT: bool(self.text_value),
@@ -547,16 +591,47 @@ class MatchEventQualifier(models.Model):
         }
 
         selected_count = sum(provided_values.values())
+        errors = {}
 
+        # Exactly one typed value field must be populated.
         if selected_count != 1:
-            raise ValidationError(
-                _("Exactly one typed value field must be populated on a qualifier.")
+            errors["value_type"] = _(
+                "Exactly one typed value field must be populated on a qualifier."
             )
 
-        if not provided_values.get(self.value_type, False):
-            raise ValidationError(
-                {"value_type": _("The populated value field must match value_type.")}
+        # The populated value must match value_type.
+        elif not provided_values.get(self.value_type, False):
+            errors["value_type"] = _("The populated value field must match value_type.")
+
+        # If a team qualifier is used, keep it aligned to the match team.
+        if self.team_value_id and self.event_id and self.team_value_id != self.event.match.team_id:
+            errors["team_value"] = _(
+                "Selected team value must match the team attached to the event's match."
             )
+
+        # If an event qualifier is used, it must reference an event from the same match.
+        if self.event_value_id and self.event_id:
+            if self.event_value.match_id != self.event.match_id:
+                errors["event_value"] = _(
+                    "Selected event value must belong to the same match as the parent event."
+                )
+
+        # If both player_value and team_value are populated, keep them club-consistent.
+        if self.player_value_id and self.team_value_id:
+            if self.player_value.club_id != self.team_value.club_id:
+                errors["player_value"] = _(
+                    "Selected player value must belong to the same club as the selected team value."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """
+        Run full model validation before saving the qualifier.
+        """
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class MatchEventLink(models.Model):
@@ -615,13 +690,28 @@ class MatchEventLink(models.Model):
     def clean(self):
         """
         Validate basic event link integrity.
+
+        Rules:
+        - an event cannot link to itself
+        - linked events must belong to the same match
         """
+        errors = {}
+
         # Prevent self-linking.
-        if self.from_event_id == self.to_event_id:
-            raise ValidationError(_("An event cannot link to itself."))
+        if self.from_event_id and self.to_event_id and self.from_event_id == self.to_event_id:
+            errors["to_event"] = _("An event cannot link to itself.")
 
         # Linked events must belong to the same match.
         if self.from_event_id and self.to_event_id:
             if self.from_event.match_id != self.to_event.match_id:
-                raise ValidationError(_("Linked events must belong to the same match."))
+                errors["to_event"] = _("Linked events must belong to the same match.")
 
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        """
+        Run full model validation before saving the event link.
+        """
+        self.full_clean()
+        super().save(*args, **kwargs)
