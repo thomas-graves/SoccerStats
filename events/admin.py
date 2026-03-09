@@ -1,7 +1,14 @@
 """
 Admin configuration for the events app.
 
-This file controls how match event records appear in Django admin.
+This file controls how event-related models appear in Django admin.
+It is designed to support structured manual post-match event entry by admins.
+
+The admin workflow currently provides:
+- a core MatchEvent form
+- participant inlines
+- qualifier inlines
+- a separate MatchEventLink admin
 """
 
 from django.contrib import admin
@@ -16,16 +23,34 @@ from .models import (
 
 class MatchEventParticipantInline(admin.TabularInline):
     """
-    Inline admin for event participants.
+    Inline editor for event participants.
 
-    This lets an admin attach one or more participants to an event,
-    each with a role such as actor, assister, goalkeeper, fouled, etc.
+    Each participant row captures a role in the event, such as:
+    - actor
+    - recipient
+    - goalkeeper
+    - fouler
+    - card receiver
+    - substituted on / off
     """
+
     model = MatchEventParticipant
+
+    # Explicitly tell Django which ForeignKey points back to MatchEvent.
+    # This avoids ambiguity because other foreign keys in the model
+    # may also point to event-related models.
     fk_name = "event"
+
+    # Start with no blank rows, but allow admins to add more as needed.
     extra = 0
 
-    # Show the most important participant fields directly in the event form.
+    # Make the related player lookup easier to use.
+    autocomplete_fields = ["player", "team"]
+
+    # Show a direct link to edit an existing inline object if needed.
+    show_change_link = True
+
+    # Keep the inline columns focused on match-entry needs.
     fields = (
         "role",
         "team",
@@ -35,22 +60,35 @@ class MatchEventParticipantInline(admin.TabularInline):
         "sequence_index",
     )
 
-    # Keeps created/updated timestamps out of the inline form.
-    show_change_link = True
-
 
 class MatchEventQualifierInline(admin.TabularInline):
     """
-    Inline admin for event qualifiers.
+    Inline editor for event qualifiers.
 
-    Qualifiers store event-specific metadata using a typed key/value structure.
-    Because qualifiers are flexible, we expose all typed value fields here.
-    Admins should populate exactly one typed value field per row.
+    Qualifiers store event-specific metadata without bloating the core
+    MatchEvent table. Examples include:
+    - body_part
+    - shot_on_target
+    - chance_quality
+    - set_piece_type
+    - card_reason
     """
+
     model = MatchEventQualifier
+
+    # Explicitly identify the parent event foreign key.
     fk_name = "event"
+
+    # Start with no blank rows, but allow admins to add more as needed.
     extra = 0
 
+    # These related lookups are helpful for typed qualifier values.
+    autocomplete_fields = ["team_value", "player_value", "event_value"]
+
+    # Show a direct link to edit an existing inline object if needed.
+    show_change_link = True
+
+    # Keep the inline focused on typed qualifier entry.
     fields = (
         "key",
         "value_type",
@@ -64,21 +102,18 @@ class MatchEventQualifierInline(admin.TabularInline):
         "sequence_index",
     )
 
-    show_change_link = True
-
 
 @admin.register(MatchEvent)
 class MatchEventAdmin(admin.ModelAdmin):
     """
-    Main admin for match events.
-
-    This is the core workflow screen for entering a match event,
-    then attaching participants and qualifiers beneath it.
+    Configure how MatchEvent records are displayed and edited in Django admin.
     """
 
-    # Useful overview columns in the event list page.
+    # Inlines provide the main event-entry workflow.
+    inlines = [MatchEventParticipantInline, MatchEventQualifierInline]
+
+    # Helpful columns for browsing a match timeline in admin.
     list_display = (
-        "id",
         "match",
         "team",
         "event_type",
@@ -88,27 +123,31 @@ class MatchEventAdmin(admin.ModelAdmin):
         "second",
         "sequence_index",
         "outcome",
+        "created_at",
+        "updated_at",
     )
 
-    # Common filters for timeline/event browsing.
+    # Support searching by match and free-text notes.
+    search_fields = (
+        "match__team__name",
+        "match__opponent__name",
+        "event_type",
+        "notes",
+    )
+
+    # Useful filters for narrowing the event list.
     list_filter = (
         "event_type",
         "period",
         "outcome",
         "team",
-        "match",
+        "match__season",
+        "match__competition",
     )
 
-    # Lightweight search fields that do not assume any unknown Player/Team name fields.
-    search_fields = (
-        "notes",
-        "id",
-        "match__id",
-    )
-
-    # Helps keep timeline ordering consistent in the admin list page.
+    # Keep the timeline ordering intuitive.
     ordering = (
-        "match",
+        "-match__match_date",
         "period",
         "minute",
         "added_minute",
@@ -117,7 +156,10 @@ class MatchEventAdmin(admin.ModelAdmin):
         "id",
     )
 
-    # Reduce clutter by grouping related fields.
+    # Make the foreign key selection smoother for admins.
+    autocomplete_fields = ["match", "team"]
+
+    # Group the form into clearer sections for event entry.
     fieldsets = (
         (
             "Core event details",
@@ -126,7 +168,6 @@ class MatchEventAdmin(admin.ModelAdmin):
                     "match",
                     "team",
                     "event_type",
-                    "period",
                     "outcome",
                 )
             },
@@ -135,6 +176,7 @@ class MatchEventAdmin(admin.ModelAdmin):
             "Timing",
             {
                 "fields": (
+                    "period",
                     "minute",
                     "added_minute",
                     "second",
@@ -143,16 +185,14 @@ class MatchEventAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Pitch coordinates",
+            "Optional pitch coordinates",
             {
                 "fields": (
-                    ("start_x", "start_y"),
-                    ("end_x", "end_y"),
-                ),
-                "description": (
-                    "Coordinates are stored as percentages from 0 to 100. "
-                    "A visual pitch widget can be added later."
-                ),
+                    "start_x",
+                    "start_y",
+                    "end_x",
+                    "end_y",
+                )
             },
         ),
         (
@@ -163,23 +203,14 @@ class MatchEventAdmin(admin.ModelAdmin):
         ),
     )
 
-    # Add the two most important supporting models directly underneath the event.
-    inlines = [
-        MatchEventParticipantInline,
-        MatchEventQualifierInline,
-    ]
-
 
 @admin.register(MatchEventParticipant)
 class MatchEventParticipantAdmin(admin.ModelAdmin):
     """
-    Standalone admin for participants.
-
-    Useful for debugging, bulk inspection, and reverse lookups
-    outside the parent MatchEvent form.
+    Configure how MatchEventParticipant rows are displayed in Django admin.
     """
+
     list_display = (
-        "id",
         "event",
         "role",
         "team",
@@ -187,93 +218,112 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "display_name",
         "shirt_number",
         "sequence_index",
+        "created_at",
+        "updated_at",
+    )
+
+    search_fields = (
+        "event__match__team__name",
+        "event__match__opponent__name",
+        "role",
+        "player__first_name",
+        "player__last_name",
+        "display_name",
     )
 
     list_filter = (
         "role",
         "team",
-    )
-
-    search_fields = (
-        "display_name",
-        "id",
-        "event__id",
+        "event__match__season",
+        "event__match__competition",
     )
 
     ordering = (
-        "event",
-        "role",
+        "-event__match__match_date",
+        "event__period",
+        "event__minute",
+        "event__added_minute",
+        "event__second",
         "sequence_index",
         "id",
     )
+
+    autocomplete_fields = ["event", "team", "player"]
 
 
 @admin.register(MatchEventQualifier)
 class MatchEventQualifierAdmin(admin.ModelAdmin):
     """
-    Standalone admin for qualifiers.
-
-    This is especially useful while the flexible event schema is still
-    being tested and refined.
+    Configure how MatchEventQualifier rows are displayed in Django admin.
     """
+
     list_display = (
-        "id",
         "event",
         "key",
         "value_type",
+        "value",
         "sequence_index",
+    )
+
+    search_fields = (
+        "event__match__team__name",
+        "event__match__opponent__name",
+        "key",
+        "text_value",
     )
 
     list_filter = (
         "value_type",
         "key",
-    )
-
-    search_fields = (
-        "key",
-        "id",
-        "event__id",
-        "text_value",
+        "event__match__season",
+        "event__match__competition",
     )
 
     ordering = (
-        "event",
-        "key",
+        "-event__match__match_date",
+        "event__period",
+        "event__minute",
+        "event__added_minute",
+        "event__second",
         "sequence_index",
         "id",
     )
+
+    autocomplete_fields = ["event", "team_value", "player_value", "event_value"]
 
 
 @admin.register(MatchEventLink)
 class MatchEventLinkAdmin(admin.ModelAdmin):
     """
-    Standalone admin for event-to-event links.
-
-    We keep this as a separate admin page for now because links are
-    slightly more complex than participants/qualifiers and are easier
-    to inspect in their own table first.
+    Configure how MatchEventLink rows are displayed in Django admin.
     """
+
     list_display = (
-        "id",
         "from_event",
         "link_type",
         "to_event",
         "sequence_index",
     )
 
-    list_filter = (
-        "link_type",
-    )
-
     search_fields = (
-        "id",
-        "from_event__id",
-        "to_event__id",
+        "from_event__match__team__name",
+        "from_event__match__opponent__name",
+        "to_event__match__team__name",
+        "to_event__match__opponent__name",
+        "link_type",
         "notes",
     )
 
+    list_filter = (
+        "link_type",
+        "from_event__match__season",
+        "from_event__match__competition",
+    )
+
     ordering = (
-        "from_event",
+        "-from_event__match__match_date",
         "sequence_index",
         "id",
     )
+
+    autocomplete_fields = ["from_event", "to_event"]
