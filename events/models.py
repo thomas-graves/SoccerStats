@@ -698,13 +698,9 @@ class MatchEventQualifier(models.Model):
 
     def clean(self):
         """
-        Ensure exactly one typed value field is populated,
-        and that it matches value_type.
-
-        Additional consistency rules:
-        - team_value must match the team attached to the event's match
-        - event_value must belong to the same match as the parent event
-        - if both player_value and team_value are supplied, they must belong to the same club
+        Validate that the qualifier uses exactly one typed value, that the value
+        matches value_type, and that the qualifier key uses the correct type and
+        controlled vocabulary where appropriate.
         """
         provided_values = {
             EventQualifierValueType.TEXT: bool(self.text_value),
@@ -729,12 +725,6 @@ class MatchEventQualifier(models.Model):
         elif not provided_values.get(self.value_type, False):
             errors["value_type"] = _("The populated value field must match value_type.")
 
-        # If a team qualifier is used, keep it aligned to the match team.
-        if self.team_value_id and self.event_id and self.team_value_id != self.event.match.team_id:
-            errors["team_value"] = _(
-                "Selected team value must match the team attached to the event's match."
-            )
-
         # If an event qualifier is used, it must reference an event from the same match.
         if self.event_value_id and self.event_id:
             if self.event_value.match_id != self.event.match_id:
@@ -742,11 +732,129 @@ class MatchEventQualifier(models.Model):
                     "Selected event value must belong to the same match as the parent event."
                 )
 
-        # If both player_value and team_value are populated, keep them club-consistent.
-        if self.player_value_id and self.team_value_id:
-            if self.player_value.club_id != self.team_value.club_id:
-                errors["player_value"] = _(
-                    "Selected player value must belong to the same club as the selected team value."
+        # Controlled qualifier key -> expected value type mapping.
+        expected_value_types = {
+            EventQualifierKey.BODY_PART: EventQualifierValueType.TEXT,
+            EventQualifierKey.UNDER_PRESSURE: EventQualifierValueType.BOOL,
+            EventQualifierKey.BIG_CHANCE: EventQualifierValueType.BOOL,
+            EventQualifierKey.PASS_LENGTH: EventQualifierValueType.TEXT,
+            EventQualifierKey.PASS_PROFILE: EventQualifierValueType.TEXT,
+            EventQualifierKey.PASS_HEIGHT: EventQualifierValueType.TEXT,
+            EventQualifierKey.PASS_DIRECTION: EventQualifierValueType.TEXT,
+            EventQualifierKey.PROGRESSIVE: EventQualifierValueType.BOOL,
+            EventQualifierKey.RESTART_TYPE: EventQualifierValueType.TEXT,
+            EventQualifierKey.RESTART_SIDE: EventQualifierValueType.TEXT,
+            EventQualifierKey.FREE_KICK_PROFILE: EventQualifierValueType.TEXT,
+            EventQualifierKey.SHOT_ZONE: EventQualifierValueType.TEXT,
+            EventQualifierKey.SHOT_ON_TARGET: EventQualifierValueType.BOOL,
+            EventQualifierKey.SHOT_TARGET_HORIZONTAL: EventQualifierValueType.TEXT,
+            EventQualifierKey.SHOT_TARGET_VERTICAL: EventQualifierValueType.TEXT,
+            EventQualifierKey.HIT_WOODWORK: EventQualifierValueType.BOOL,
+            EventQualifierKey.TACKLE_PROFILE: EventQualifierValueType.TEXT,
+            EventQualifierKey.FOUL_PROFILE: EventQualifierValueType.TEXT,
+            EventQualifierKey.CARD_TYPE: EventQualifierValueType.TEXT,
+            EventQualifierKey.CARD_REASON: EventQualifierValueType.TEXT,
+        }
+
+        # Enforce the expected typed value for each controlled qualifier key.
+        expected_type = expected_value_types.get(self.key)
+        if expected_type and self.value_type != expected_type:
+            errors["value_type"] = _(
+                f"Qualifier key '{self.key}' must use value_type '{expected_type}'."
+            )
+
+        # Controlled vocabularies for text-based qualifiers.
+        allowed_text_values = {
+            EventQualifierKey.BODY_PART: {
+                "left_foot",
+                "right_foot",
+                "head",
+                "chest",
+                "hands",
+                "other",
+            },
+            EventQualifierKey.PASS_LENGTH: {
+                "short",
+                "medium",
+                "long",
+            },
+            EventQualifierKey.PASS_PROFILE: {
+                "long_pass",
+                "long_ball",
+                "through_ball",
+                "cross",
+                "cutback",
+                "switch",
+            },
+            EventQualifierKey.PASS_HEIGHT: {
+                "ground",
+                "lofted",
+            },
+            EventQualifierKey.PASS_DIRECTION: {
+                "forward",
+                "backward",
+                "lateral",
+            },
+            EventQualifierKey.RESTART_TYPE: {
+                "corner",
+                "free_kick",
+                "goal_kick",
+                "throw_in",
+                "penalty",
+            },
+            EventQualifierKey.RESTART_SIDE: {
+                "left",
+                "right",
+                "centre",
+            },
+            EventQualifierKey.FREE_KICK_PROFILE: {
+                "direct",
+                "indirect",
+            },
+            EventQualifierKey.SHOT_ZONE: {
+                "inside_box",
+                "outside_box",
+            },
+            EventQualifierKey.SHOT_TARGET_HORIZONTAL: {
+                "left",
+                "centre",
+                "right",
+            },
+            EventQualifierKey.SHOT_TARGET_VERTICAL: {
+                "low",
+                "mid",
+                "high",
+            },
+            EventQualifierKey.TACKLE_PROFILE: {
+                "standing",
+                "sliding",
+            },
+            EventQualifierKey.FOUL_PROFILE: {
+                "handling",
+                "tripping",
+                "kicking",
+                "pushing",
+                "striking",
+                "charging",
+                "tackling",
+                "holding",
+                "biting",
+                "spitting",
+                "goalkeeping_offence",
+                "dangerous_play",
+            },
+            EventQualifierKey.CARD_TYPE: {
+                "yellow",
+                "red",
+                "second_yellow_red",
+            },
+        }
+
+        # If the qualifier uses a controlled text vocabulary, enforce it.
+        if self.value_type == EventQualifierValueType.TEXT and self.key in allowed_text_values:
+            if self.text_value not in allowed_text_values[self.key]:
+                errors["text_value"] = _(
+                    f"Value '{self.text_value}' is not valid for qualifier key '{self.key}'."
                 )
 
         if errors:
