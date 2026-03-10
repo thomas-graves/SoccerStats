@@ -42,6 +42,13 @@ class MatchResolutionChoices(models.TextChoices):
     PENALTIES = "penalties", "Penalties"
 
 
+class EventCaptureModeChoices(models.TextChoices):
+    """Define how detailed the event and stats capture is for a match."""
+
+    FULL_TIMELINE = "full_timeline", "Full timeline"
+    KEY_EVENTS_ONLY = "key_events_only", "Key events only"
+
+
 class Match(models.Model):
     """Store the basic details and result information for a match."""
 
@@ -128,6 +135,14 @@ class Match(models.Model):
         null=True,
         help_text="How the final result of the match was resolved.",
     )
+    event_capture_mode = models.CharField(
+        max_length=20,
+        choices=EventCaptureModeChoices.choices,
+        default=EventCaptureModeChoices.FULL_TIMELINE,
+        help_text=(
+            "Defines whether this match has a full coded event timeline or only key events."
+        ),
+    )
     penalties_team_score = models.PositiveIntegerField(
         blank=True,
         null=True,
@@ -137,6 +152,14 @@ class Match(models.Model):
         blank=True,
         null=True,
         help_text="Penalty shootout goals scored by the opponent, if applicable.",
+    )
+    player_of_the_match = models.ForeignKey(
+        "lineups.LineupEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="player_of_match_awards",
+        help_text="Optional Player of the Match selection from the club lineup.",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -181,6 +204,16 @@ class Match(models.Model):
         if self.result_resolution != MatchResolutionChoices.PENALTIES:
             if self.penalties_team_score is not None or self.penalties_opponent_score is not None:
                 errors["result_resolution"] = "Penalty shootout scores should only be entered when the result was decided on penalties."
+
+        # If a Player of the Match is selected, it must come from this match's lineup.
+        #
+        # We only enforce this once the Match already exists in the database,
+        # because a brand new Match does not yet have a primary key.
+        if self.player_of_the_match_id and self.pk:
+            if self.player_of_the_match.match_id != self.pk:
+                errors["player_of_the_match"] = (
+                    "Selected Player of the Match must belong to this match."
+                )
 
         if errors:
             raise ValidationError(errors)

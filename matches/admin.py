@@ -26,6 +26,8 @@ class MatchAdmin(admin.ModelAdmin):
         "team_score",
         "opponent_score",
         "outcome",
+        "event_capture_mode",
+        "player_of_the_match",
     )
 
     # Fields that can be searched in the admin search bar.
@@ -35,6 +37,8 @@ class MatchAdmin(admin.ModelAdmin):
         "competition__name",
         "round_label",
         "venue__name",
+        "player_of_the_match__registration__player__first_name",
+        "player_of_the_match__registration__player__last_name",
     )
 
     # Filters shown in the admin sidebar.
@@ -45,10 +49,14 @@ class MatchAdmin(admin.ModelAdmin):
         "season",
         "team",
         "result_resolution",
+        "event_capture_mode",
     )
 
     # Default ordering for the admin list page.
     ordering = ("-match_date", "kickoff_time", "team__name")
+
+    # Make related-object selection easier to use.
+    autocomplete_fields = ["player_of_the_match"]
 
     # Group fields into clearer sections in the admin form.
     fieldsets = (
@@ -80,6 +88,15 @@ class MatchAdmin(admin.ModelAdmin):
                     "result_resolution",
                     "penalties_team_score",
                     "penalties_opponent_score",
+                    "player_of_the_match",
+                )
+            },
+        ),
+        (
+            "Event and stats capture",
+            {
+                "fields": (
+                    "event_capture_mode",
                 )
             },
         ),
