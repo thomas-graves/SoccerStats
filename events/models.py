@@ -16,7 +16,7 @@ TEAM_MODEL = "teams.Team"
 PLAYER_MODEL = "players.Player"
 LINEUP_ENTRY_MODEL = "lineups.LineupEntry"
 MATCH_COACH_ASSIGNMENT_MODEL = "coaches.MatchCoachAssignment"
-
+OPPONENT_LINEUP_ENTRY_MODEL = "opponents.OpponentLineupEntry"
 
 # Shared qualifier configuration
 #
@@ -644,8 +644,9 @@ class MatchEventParticipant(models.Model):
 
     Current participant sources:
     - lineup_entry for club-side players involved in the match
+    - opponent_lineup_entry for opponent-side players involved in the match
     - match_coach_assignment for coaches involved in the match
-    - display_name as a fallback for opponent or unknown participants
+    - display_name as a fallback for unknown participants
 
     This keeps the event system aligned to the actual match context while still
     allowing incomplete or opponent-side data to be recorded.
@@ -672,6 +673,16 @@ class MatchEventParticipant(models.Model):
         blank=True,
         related_name="event_participations",
         help_text=_("Use for club-side player participants tied to this specific match."),
+    )
+
+    # Opponent-side player reference for this specific match.
+    opponent_lineup_entry = models.ForeignKey(
+        OPPONENT_LINEUP_ENTRY_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_participations",
+        help_text=_("Use for opponent-side player participants tied to this specific match."),
     )
 
     # Coach reference for this specific match.
@@ -736,6 +747,8 @@ class MatchEventParticipant(models.Model):
         """
         if self.lineup_entry_id:
             return f"{self.role}: {self.lineup_entry.registration.player}"
+        if self.opponent_lineup_entry_id:
+            return f"{self.role}: {self.opponent_lineup_entry}"
         if self.match_coach_assignment_id:
             return f"{self.role}: {self.match_coach_assignment.coach_registration.coach}"
         if self.display_name:
@@ -757,6 +770,7 @@ class MatchEventParticipant(models.Model):
         source_count = sum(
             [
                 bool(self.lineup_entry_id),
+                bool(self.opponent_lineup_entry_id),
                 bool(self.match_coach_assignment_id),
                 bool(self.display_name),
             ]
@@ -764,18 +778,24 @@ class MatchEventParticipant(models.Model):
 
         if source_count == 0:
             errors["display_name"] = _(
-                "Provide a lineup entry, a match coach assignment, or a display name."
+                "Provide a lineup entry, an opponent lineup entry, a match coach assignment, or a display name."
             )
 
         if source_count > 1:
             errors["display_name"] = _(
-                "Use only one participant source: lineup entry, match coach assignment, or display name."
+                "Use only one participant source: lineup entry, opponent lineup entry, match coach assignment, or display name."
             )
 
         if self.lineup_entry_id and self.event_id:
             if self.lineup_entry.match_id != self.event.match_id:
                 errors["lineup_entry"] = _(
                     "Selected lineup entry must belong to the same match as the event."
+                )
+
+        if self.opponent_lineup_entry_id and self.event_id:
+            if self.opponent_lineup_entry.match_id != self.event.match_id:
+                errors["opponent_lineup_entry"] = _(
+                    "Selected opponent lineup entry must belong to the same match as the event."
                 )
 
         if self.match_coach_assignment_id and self.event_id:

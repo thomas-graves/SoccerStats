@@ -85,7 +85,11 @@ class MatchEventParticipantInline(admin.TabularInline):
     extra = 0
 
     # Make the related player lookup easier to use.
-    autocomplete_fields = ["lineup_entry", "match_coach_assignment"]
+    autocomplete_fields = [
+        "lineup_entry", 
+        "opponent_lineup_entry", 
+        "match_coach_assignment"
+    ]
 
     # Show a direct link to edit an existing inline object if needed.
     show_change_link = True
@@ -94,6 +98,7 @@ class MatchEventParticipantInline(admin.TabularInline):
     fields = (
         "role",
         "lineup_entry",
+        "opponent_lineup_entry",
         "match_coach_assignment",
         "display_name",
         "shirt_number",
@@ -255,6 +260,7 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "event",
         "role",
         "lineup_entry",
+        "opponent_lineup_entry",
         "match_coach_assignment",
         "display_name",
         "shirt_number",
@@ -269,6 +275,8 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "role",
         "lineup_entry__registration__player__first_name",
         "lineup_entry__registration__player__last_name",
+        "opponent_lineup_entry__display_name",
+        "opponent_lineup_entry__shirt_number",
         "match_coach_assignment__coach_registration__coach__first_name",
         "match_coach_assignment__coach_registration__coach__last_name",
         "display_name",
@@ -290,7 +298,12 @@ class MatchEventParticipantAdmin(admin.ModelAdmin):
         "id",
     )
 
-    autocomplete_fields = ["event", "lineup_entry", "match_coach_assignment"]
+    autocomplete_fields = [
+        "event",
+        "lineup_entry",
+        "opponent_lineup_entry",
+        "match_coach_assignment",
+    ]
 
 
 @admin.register(MatchEventQualifier)
