@@ -703,6 +703,13 @@ class MatchEvent(models.Model):
                     errors["event_type"] = _(
                         "Substitution events must include both subbed_off and subbed_on participants."
                     )
+
+                qualifier_keys = set(self.qualifiers.values_list("key", flat=True))
+
+                if EventQualifierKey.SUBBED_ON_POSITION not in qualifier_keys:
+                    errors["event_type"] = _(
+                        "Substitution events must include a subbed_on_position qualifier."
+                    )
             
             # Position changes should identify the player whose role changed and
             # the new position they moved into.
