@@ -41,6 +41,10 @@ QUALIFIER_EXPECTED_VALUE_TYPES = {
     "restart_type": "text",
     "restart_side": "text",
     "free_kick_profile": "text",
+    "subbed_on_position": "text",
+    "subbed_off_position": "text",
+    "position_from": "text",
+    "position_to": "text",
     "shot_zone": "text",
     "shot_on_target": "bool",
     "shot_target_horizontal": "text",
@@ -102,6 +106,82 @@ QUALIFIER_ALLOWED_TEXT_VALUES = {
     "free_kick_profile": {
         "direct",
         "indirect",
+    },
+        "subbed_on_position": {
+        "GK",
+        "CB",
+        "RB",
+        "LB",
+        "RWB",
+        "LWB",
+        "CDM",
+        "CM",
+        "RM",
+        "LM",
+        "CAM",
+        "RW",
+        "LW",
+        "CF",
+        "RS",
+        "LS",
+        "ST",
+    },
+    "subbed_off_position": {
+        "GK",
+        "CB",
+        "RB",
+        "LB",
+        "RWB",
+        "LWB",
+        "CDM",
+        "CM",
+        "RM",
+        "LM",
+        "CAM",
+        "RW",
+        "LW",
+        "CF",
+        "RS",
+        "LS",
+        "ST",
+    },
+    "position_from": {
+        "GK",
+        "CB",
+        "RB",
+        "LB",
+        "RWB",
+        "LWB",
+        "CDM",
+        "CM",
+        "RM",
+        "LM",
+        "CAM",
+        "RW",
+        "LW",
+        "CF",
+        "RS",
+        "LS",
+        "ST",
+    },
+    "position_to": {
+        "GK",
+        "CB",
+        "RB",
+        "LB",
+        "RWB",
+        "LWB",
+        "CDM",
+        "CM",
+        "RM",
+        "LM",
+        "CAM",
+        "RW",
+        "LW",
+        "CF",
+        "RS",
+        "LS",
+        "ST",
     },
     "shot_zone": {
         "inside_box",
@@ -190,6 +270,18 @@ QUALIFIER_ALLOWED_EVENT_TYPES = {
     "free_kick_profile": {
         "pass",
         "shot",
+    },
+        "subbed_on_position": {
+        "substitution",
+    },
+    "subbed_off_position": {
+        "substitution",
+    },
+    "position_from": {
+        "position_change",
+    },
+    "position_to": {
+        "position_change",
     },
     "shot_zone": {
         "shot",
@@ -321,6 +413,9 @@ class EventType(models.TextChoices):
     FOUL_WON = "foul_won", _("Foul won")
     OFFSIDE = "offside", _("Offside")
     CARD = "card", _("Card")
+
+    # Positional / tactical changes
+    POSITION_CHANGE = "position_change", _("Position change")
     SUBSTITUTION = "substitution", _("Substitution")
 
 
@@ -369,6 +464,12 @@ class EventQualifierKey(models.TextChoices):
     RESTART_TYPE = "restart_type", _("Restart type")
     RESTART_SIDE = "restart_side", _("Restart side")
     FREE_KICK_PROFILE = "free_kick_profile", _("Free kick profile")
+
+    # Positional / tactical changes
+    SUBBED_ON_POSITION = "subbed_on_position", _("Subbed on position")
+    SUBBED_OFF_POSITION = "subbed_off_position", _("Subbed off position")
+    POSITION_FROM = "position_from", _("Position from")
+    POSITION_TO = "position_to", _("Position to")
 
     # Shooting
     SHOT_ZONE = "shot_zone", _("Shot zone")
@@ -601,6 +702,21 @@ class MatchEvent(models.Model):
                 if missing_roles:
                     errors["event_type"] = _(
                         "Substitution events must include both subbed_off and subbed_on participants."
+                    )
+            
+            # Position changes should identify the player whose role changed and
+            # the new position they moved into.
+            if self.event_type == EventType.POSITION_CHANGE:
+                if EventParticipantRole.ACTOR not in participant_roles:
+                    errors["event_type"] = _(
+                        "Position change events must include an actor participant."
+                    )
+
+                qualifier_keys = set(self.qualifiers.values_list("key", flat=True))
+
+                if EventQualifierKey.POSITION_TO not in qualifier_keys:
+                    errors["event_type"] = _(
+                        "Position change events must include a position_to qualifier."
                     )
 
         if errors:

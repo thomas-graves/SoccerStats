@@ -32,6 +32,22 @@
         restart_type: ["corner", "free_kick", "goal_kick", "penalty", "throw_in"],
         restart_side: ["centre", "left", "right"],
         free_kick_profile: ["direct", "indirect"],
+        subbed_on_position: [
+            "CAM", "CB", "CDM", "CF", "CM", "GK", "LB", "LM", "LS",
+            "LW", "LWB", "RB", "RM", "RS", "RW", "RWB", "ST"
+        ],
+        subbed_off_position: [
+            "CAM", "CB", "CDM", "CF", "CM", "GK", "LB", "LM", "LS",
+            "LW", "LWB", "RB", "RM", "RS", "RW", "RWB", "ST"
+        ],
+        position_from: [
+            "CAM", "CB", "CDM", "CF", "CM", "GK", "LB", "LM", "LS",
+            "LW", "LWB", "RB", "RM", "RS", "RW", "RWB", "ST"
+        ],
+        position_to: [
+            "CAM", "CB", "CDM", "CF", "CM", "GK", "LB", "LM", "LS",
+            "LW", "LWB", "RB", "RM", "RS", "RW", "RWB", "ST"
+        ],
         shot_zone: ["inside_box", "outside_box"],
         shot_target_horizontal: ["centre", "left", "right"],
         shot_target_vertical: ["high", "low", "mid"],
