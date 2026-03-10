@@ -12,13 +12,53 @@ The admin workflow currently provides:
 """
 
 from django.contrib import admin
+from django import forms
 
 from .models import (
     MatchEvent,
     MatchEventLink,
     MatchEventParticipant,
     MatchEventQualifier,
+    QUALIFIER_ALLOWED_TEXT_VALUES,
 )
+
+
+class MatchEventQualifierAdminForm(forms.ModelForm):
+    """
+    Admin form for event qualifiers.
+
+    This form improves qualifier entry by:
+    - using a dropdown for controlled text qualifiers
+    - keeping the existing typed-value structure intact
+    - reducing typing errors for common football vocabularies
+    """
+
+    class Meta:
+        model = MatchEventQualifier
+        fields = "__all__"
+
+    class Media:
+        """
+        Load the custom admin JavaScript that makes qualifier text values
+        reactively switch to dropdowns for controlled qualifier keys.
+        """
+        js = ("events/js/qualifier_admin.js",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Resolve the selected qualifier key for:
+        # - existing objects
+        # - bound admin forms
+        # - inline forms with prefixes
+        selected_key = self.data.get(self.add_prefix("key")) or getattr(self.instance, "key", None)
+
+        # For controlled text qualifiers, swap the default text input for a dropdown.
+        if selected_key in QUALIFIER_ALLOWED_TEXT_VALUES:
+            choices = [("", "---------")] + [
+                (value, value) for value in sorted(QUALIFIER_ALLOWED_TEXT_VALUES[selected_key])
+            ]
+            self.fields["text_value"].widget = forms.Select(choices=choices)
 
 
 class MatchEventParticipantInline(admin.TabularInline):
@@ -75,6 +115,7 @@ class MatchEventQualifierInline(admin.TabularInline):
     """
 
     model = MatchEventQualifier
+    form = MatchEventQualifierAdminForm
 
     # Explicitly identify the parent event foreign key.
     fk_name = "event"
@@ -257,6 +298,8 @@ class MatchEventQualifierAdmin(admin.ModelAdmin):
     """
     Configure how MatchEventQualifier rows are displayed in Django admin.
     """
+
+    form = MatchEventQualifierAdminForm
 
     list_display = (
         "event",

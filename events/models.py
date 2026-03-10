@@ -18,6 +18,209 @@ LINEUP_ENTRY_MODEL = "lineups.LineupEntry"
 MATCH_COACH_ASSIGNMENT_MODEL = "coaches.MatchCoachAssignment"
 
 
+# Shared qualifier configuration
+#
+# These mappings are used to keep qualifier behaviour consistent across:
+# - model validation
+# - admin forms
+# - future custom event-entry UI
+#
+# The goal is to avoid duplicating football vocabularies in multiple places
+# and to make it easy to present dropdown options instead of raw text input.
+
+# Expected typed value for each controlled qualifier key.
+QUALIFIER_EXPECTED_VALUE_TYPES = {
+    "body_part": "text",
+    "under_pressure": "bool",
+    "big_chance": "bool",
+    "pass_length": "text",
+    "pass_profile": "text",
+    "pass_height": "text",
+    "pass_direction": "text",
+    "progressive": "bool",
+    "restart_type": "text",
+    "restart_side": "text",
+    "free_kick_profile": "text",
+    "shot_zone": "text",
+    "shot_on_target": "bool",
+    "shot_target_horizontal": "text",
+    "shot_target_vertical": "text",
+    "hit_woodwork": "bool",
+    "tackle_profile": "text",
+    "foul_profile": "text",
+    "card_type": "text",
+    "card_reason": "text",
+}
+
+# Allowed text values for controlled text-based qualifier keys.
+#
+# These are the values we ultimately want admins to select from a dropdown
+# rather than type manually.
+QUALIFIER_ALLOWED_TEXT_VALUES = {
+    "body_part": {
+        "left_foot",
+        "right_foot",
+        "head",
+        "chest",
+        "hands",
+        "other",
+    },
+    "pass_length": {
+        "short",
+        "medium",
+        "long",
+    },
+    "pass_profile": {
+        "long_pass",
+        "long_ball",
+        "through_ball",
+        "cross",
+        "cutback",
+        "switch",
+    },
+    "pass_height": {
+        "ground",
+        "lofted",
+    },
+    "pass_direction": {
+        "forward",
+        "backward",
+        "lateral",
+    },
+    "restart_type": {
+        "corner",
+        "free_kick",
+        "goal_kick",
+        "throw_in",
+        "penalty",
+    },
+    "restart_side": {
+        "left",
+        "right",
+        "centre",
+    },
+    "free_kick_profile": {
+        "direct",
+        "indirect",
+    },
+    "shot_zone": {
+        "inside_box",
+        "outside_box",
+    },
+    "shot_target_horizontal": {
+        "left",
+        "centre",
+        "right",
+    },
+    "shot_target_vertical": {
+        "low",
+        "mid",
+        "high",
+    },
+    "tackle_profile": {
+        "standing",
+        "sliding",
+    },
+    "foul_profile": {
+        "handling",
+        "tripping",
+        "kicking",
+        "pushing",
+        "striking",
+        "charging",
+        "tackling",
+        "holding",
+        "biting",
+        "spitting",
+        "goalkeeping_offence",
+        "dangerous_play",
+    },
+    "card_type": {
+        "yellow",
+        "red",
+        "second_yellow_red",
+    },
+}
+
+# Event types each qualifier key is allowed to be used on.
+QUALIFIER_ALLOWED_EVENT_TYPES = {
+    "body_part": {
+        "pass",
+        "shot",
+    },
+    "under_pressure": {
+        "pass",
+        "carry",
+        "dribble",
+        "shot",
+        "tackle",
+        "interception",
+        "clearance",
+        "ball_recovery",
+        "aerial_duel",
+    },
+    "big_chance": {
+        "shot",
+    },
+    "pass_length": {
+        "pass",
+    },
+    "pass_profile": {
+        "pass",
+    },
+    "pass_height": {
+        "pass",
+    },
+    "pass_direction": {
+        "pass",
+    },
+    "progressive": {
+        "pass",
+        "carry",
+        "dribble",
+    },
+    "restart_type": {
+        "pass",
+        "shot",
+    },
+    "restart_side": {
+        "pass",
+        "shot",
+    },
+    "free_kick_profile": {
+        "pass",
+        "shot",
+    },
+    "shot_zone": {
+        "shot",
+    },
+    "shot_on_target": {
+        "shot",
+    },
+    "shot_target_horizontal": {
+        "shot",
+    },
+    "shot_target_vertical": {
+        "shot",
+    },
+    "hit_woodwork": {
+        "shot",
+    },
+    "tackle_profile": {
+        "tackle",
+    },
+    "foul_profile": {
+        "foul_committed",
+    },
+    "card_type": {
+        "card",
+    },
+    "card_reason": {
+        "card",
+    },
+}
+
+
 class EventPeriod(models.TextChoices):
     """
     Broad match period buckets for ordering and filtering events.
@@ -732,129 +935,28 @@ class MatchEventQualifier(models.Model):
                     "Selected event value must belong to the same match as the parent event."
                 )
 
-        # Controlled qualifier key -> expected value type mapping.
-        expected_value_types = {
-            EventQualifierKey.BODY_PART: EventQualifierValueType.TEXT,
-            EventQualifierKey.UNDER_PRESSURE: EventQualifierValueType.BOOL,
-            EventQualifierKey.BIG_CHANCE: EventQualifierValueType.BOOL,
-            EventQualifierKey.PASS_LENGTH: EventQualifierValueType.TEXT,
-            EventQualifierKey.PASS_PROFILE: EventQualifierValueType.TEXT,
-            EventQualifierKey.PASS_HEIGHT: EventQualifierValueType.TEXT,
-            EventQualifierKey.PASS_DIRECTION: EventQualifierValueType.TEXT,
-            EventQualifierKey.PROGRESSIVE: EventQualifierValueType.BOOL,
-            EventQualifierKey.RESTART_TYPE: EventQualifierValueType.TEXT,
-            EventQualifierKey.RESTART_SIDE: EventQualifierValueType.TEXT,
-            EventQualifierKey.FREE_KICK_PROFILE: EventQualifierValueType.TEXT,
-            EventQualifierKey.SHOT_ZONE: EventQualifierValueType.TEXT,
-            EventQualifierKey.SHOT_ON_TARGET: EventQualifierValueType.BOOL,
-            EventQualifierKey.SHOT_TARGET_HORIZONTAL: EventQualifierValueType.TEXT,
-            EventQualifierKey.SHOT_TARGET_VERTICAL: EventQualifierValueType.TEXT,
-            EventQualifierKey.HIT_WOODWORK: EventQualifierValueType.BOOL,
-            EventQualifierKey.TACKLE_PROFILE: EventQualifierValueType.TEXT,
-            EventQualifierKey.FOUL_PROFILE: EventQualifierValueType.TEXT,
-            EventQualifierKey.CARD_TYPE: EventQualifierValueType.TEXT,
-            EventQualifierKey.CARD_REASON: EventQualifierValueType.TEXT,
-        }
-
         # Enforce the expected typed value for each controlled qualifier key.
-        expected_type = expected_value_types.get(self.key)
+        expected_type = QUALIFIER_EXPECTED_VALUE_TYPES.get(self.key)
         if expected_type and self.value_type != expected_type:
             errors["value_type"] = _(
                 f"Qualifier key '{self.key}' must use value_type '{expected_type}'."
             )
 
-        # Controlled vocabularies for text-based qualifiers.
-        allowed_text_values = {
-            EventQualifierKey.BODY_PART: {
-                "left_foot",
-                "right_foot",
-                "head",
-                "chest",
-                "hands",
-                "other",
-            },
-            EventQualifierKey.PASS_LENGTH: {
-                "short",
-                "medium",
-                "long",
-            },
-            EventQualifierKey.PASS_PROFILE: {
-                "long_pass",
-                "long_ball",
-                "through_ball",
-                "cross",
-                "cutback",
-                "switch",
-            },
-            EventQualifierKey.PASS_HEIGHT: {
-                "ground",
-                "lofted",
-            },
-            EventQualifierKey.PASS_DIRECTION: {
-                "forward",
-                "backward",
-                "lateral",
-            },
-            EventQualifierKey.RESTART_TYPE: {
-                "corner",
-                "free_kick",
-                "goal_kick",
-                "throw_in",
-                "penalty",
-            },
-            EventQualifierKey.RESTART_SIDE: {
-                "left",
-                "right",
-                "centre",
-            },
-            EventQualifierKey.FREE_KICK_PROFILE: {
-                "direct",
-                "indirect",
-            },
-            EventQualifierKey.SHOT_ZONE: {
-                "inside_box",
-                "outside_box",
-            },
-            EventQualifierKey.SHOT_TARGET_HORIZONTAL: {
-                "left",
-                "centre",
-                "right",
-            },
-            EventQualifierKey.SHOT_TARGET_VERTICAL: {
-                "low",
-                "mid",
-                "high",
-            },
-            EventQualifierKey.TACKLE_PROFILE: {
-                "standing",
-                "sliding",
-            },
-            EventQualifierKey.FOUL_PROFILE: {
-                "handling",
-                "tripping",
-                "kicking",
-                "pushing",
-                "striking",
-                "charging",
-                "tackling",
-                "holding",
-                "biting",
-                "spitting",
-                "goalkeeping_offence",
-                "dangerous_play",
-            },
-            EventQualifierKey.CARD_TYPE: {
-                "yellow",
-                "red",
-                "second_yellow_red",
-            },
-        }
-
         # If the qualifier uses a controlled text vocabulary, enforce it.
-        if self.value_type == EventQualifierValueType.TEXT and self.key in allowed_text_values:
-            if self.text_value not in allowed_text_values[self.key]:
+        if self.value_type == EventQualifierValueType.TEXT and self.key in QUALIFIER_ALLOWED_TEXT_VALUES:
+            if self.text_value not in QUALIFIER_ALLOWED_TEXT_VALUES[self.key]:
                 errors["text_value"] = _(
                     f"Value '{self.text_value}' is not valid for qualifier key '{self.key}'."
+                )
+
+        # If both the qualifier key and parent event are present, ensure the
+        # qualifier is allowed for that type of football action.
+        if self.event_id and self.key:
+            allowed_event_types = QUALIFIER_ALLOWED_EVENT_TYPES.get(self.key)
+            if allowed_event_types and self.event.event_type not in allowed_event_types:
+                errors["key"] = _(
+                    f"Qualifier key '{self.key}' is not valid for event type "
+                    f"'{self.event.event_type}'."
                 )
 
         if errors:
