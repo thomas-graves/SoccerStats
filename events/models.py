@@ -411,7 +411,7 @@ class EventLinkType(models.TextChoices):
     """
 
     CREATED_SHOT = "created_shot", _("Created shot")
-    RESULTED_IN_GOAL = "resulted_in_goal", _("Resulted in goal")
+    ASSIST = "assist", _("Assist")
     RESULTED_IN_SAVE = "resulted_in_save", _("Resulted in save")
     RESULTED_IN_CARD = "resulted_in_card", _("Resulted in card")
     REBOUND_FROM = "rebound_from", _("Rebound from")
