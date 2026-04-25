@@ -1,0 +1,378 @@
+Clarifying questions
+
+A. Event taxonomy and semantics
+
+Q1) For pass-like actions, do you want:
+- pass as the main event type, with cross, through_ball, and long_ball as qualifiers
+- or do you want cross, through_ball, and long_ball to remain their own top-level event types
+
+A1) I think having pass as the main event type, with cross, through_ball and long_ball as qualifiers, is a good idea. Though I would be interested to know what you recommend? It is important to remember that their is a difference between a long pass and a long ball. There is also a difference between a long ball and a clearance.
+
+Q2) For duels, do you want:
+- one duel event type with qualifier aerial or ground
+- or separate event types aerial_duel and ground_duel
+
+A2) I think having one duel event type, with qualifiers aerial or ground is a good idea. Though I would be interested to know what you recommend. It is important to remember that a ground duel is a 1v1 battle where the ball is on the ground, there are offensive ground duels (e.g. dribbles) and defensive ground duels (e.g. tackle). A successful dribble/unsuccessful tackle might result in a won ground duel for the attacker and a lost ground duel for the defender. An unsuccessful dribble/successful tackle might result in a lost ground duel for the attacker and a won ground duel for the defender.
+
+Q3) For cards, do you want:
+- one card event type with qualifier yellow, red, or second_yellow_red
+- or separate top-level event types for each card type
+
+A3) I think one event type for card, and qualifiers for yellow, red, or second_yellow_red, is a good idea. Though again, I am interested to hear your recommendation.
+
+Q4) For restarts, do you want:
+- one restart_taken event type with qualifier like corner, free_kick, throw_in, goal_kick, penalty
+- or separate top-level event types such as corner_taken
+
+A4) Again, I think a restart_taken event type, with qualifiers like corner, free_kick, throw_in, goal_kick, and penalty is a good idea. Though it is important to remember that a free-kick might result in a shot on goal, or a pass (so will these be linked events?), a corner could be a short pass, or a cross, or a long pass, it could be successful or unsuccessful, and could result in a shot, which results in a goal (will these also be linked events? and will we be able to track goals scored from corners? or assists from corners? or number of short corners and long corners? also right hand or left hand corners?) A throw in can also be a form of pass, it could be successful or unsuccessful, it could be progressive or not (will these things be accounted for?). Similarly, a goal_kick might have different takers, not necessarily the goal keeper, it could be a short pass, or long pass, it could be grounded or lofted, it could be successful or unsuccessful (will the goal-kick event be linked to a pass event so that the type of goal_kick can be accurately recorded? or is there a better system?). Penalties will also require there own qualifiers of course.
+
+Q5) For goals, do you want:
+- goal as its own event type
+- or shot with outcome scored
+
+A5) I am not sure what is best. Is a goal event type best, which links to a shot event type? or a successful shot with outcome scored? I would be interested to know your recommendation here. Regardless, I'd like for the methodology to be consistent, let's not implement it a certain way for an event like a shot and goal, but then a different way for a thing like a pass.
+
+Q6) For own goals, do you want:
+- own_goal as its own event type
+- or a normal shot/goal structure with a qualifier saying it was an own goal and who benefited
+
+A6) I think an own_goal event would be good, as the shot would likely be recorded as an unsuccessful shot event. This system would also account for a poor pass that results in an own goal, rather than only own goals that occur from shots. That said, would this then be inconsistent if no event were to be created for a goal? I would like to know your recommendation?
+
+Q7) For assist, key_pass, and chance_created, do you want them to be:
+- derived only from linked events
+- manually enterable as event types too
+- or manually enterable only in rare correction cases
+
+A7) I agree with your recommendation that assist, key_pass and chance_created should be derived, rather than event types.
+
+
+B. Side and team attribution
+
+Q8) Do you want every event to explicitly store a side, such as:
+- club
+- opponent
+- neutral
+
+A8) I imagine that all the match events will relate to at least one side (either the club's team or opponent). That said, sometimes an event may relate to both, for instance:
+- Unsuccessful Tackle and a Foul by Player A, results in a ground duel won and free kick won by Player B (each player from a different side)
+- Successful Dribble (Ground duel won) by Player A, results in a dribble past and ground duel lost for Player B.
+- Successful tackle (Ground Duel won) by Player A, may result in an Unsuccessful Dribble and Ground Duel lost for Player B
+
+Q9) Should team_side replace the current internal team-driven assumption as the main side marker?
+
+A9) I think it would be a good idea to store team_side, though I would like to hear your recommendation.
+
+Q10) If an event is for the club side, do you still want to store the internal team foreign key as well, or is the parent match.team enough?
+
+A10) I am not sure what this question is asking, so I will defer to your recommendation.
+
+
+
+C. Participants
+
+Q11) For club-side player events, do you want participants to point to:
+- Player
+- PlayerRegistration
+- LineupEntry
+
+A11) I agree that it is a good idea to use LineupEntry for match events, because events happen in the context of a specific match.
+
+Q12) For coach events, do you want participants to point to:
+- Coach
+- CoachRegistration
+- MatchCoachAssignment
+
+A12) I agree that it is a good idea to use MatchCoachAssignment, for the same reason as lineups.
+
+Q13) For opponent players, are you happy for now with:
+- free-text participant names only
+- optional shirt number
+- no full opponent lineup structure yet
+
+A13) I think adding an opponent lineup structure would be wise. This does not need to be as detailed as the club side lineup entry. In some cases it may just consist of shirt numbers. In other cases, it may include player names and shirt numbers. Either way, adding an Opponent Lineup model to the Opponents app would be a good idea, with an admin adding an Opponent Lineup for each match (which is linked to an existing Opponent Team, and Match). I would like to know if you think this is a good idea? Finally, there should also be an option to select something like "Unknown" when it is unknown which opponent player scored the goal, or won the foul, or made the pass, etc.
+
+Q14) Do you want the same event to support multiple participants in the same role if needed, or should a role usually be unique per event?
+
+A14) I am not sure what this question is asking, an example would be useful so I can give you a proper answer.
+
+
+D. Outcomes
+
+Q15) Do you want a richer generic outcome enum with values such as:
+- completed
+- incomplete
+- successful
+- unsuccessful
+- won
+- lost
+- scored
+- saved
+- blocked
+- off_target
+- neutral
+
+Q16) Or do you want outcomes to stay broad and push more detail into qualifiers?
+
+A15/A16) I agree with your recommendation to use a richer outcome enum if it simplifies stat derivation. Though this may contradict my previous answers.
+
+E. Qualifiers
+
+Q17) Do you want qualifier keys to be:
+- controlled from the start using enums
+- free text initially and standardized later
+
+A17) I'd like controlled keys from the start, with values controlled where practical, especially for common football terms
+
+Q18) For common qualifier families, are these the ones you want first:
+- body_part
+- pass_type
+- pass_direction
+- shot_zone
+- shot_on_target
+- set_piece_type
+- under_pressure
+- card_reason
+- restart_reason
+- scored_for_team
+
+A18) Yes, this seems like a good start, so long as it makes sense with the implementations elsewhere.
+
+Q19) For boolean-style qualifiers like under_pressure, progressive, shot_on_target, do you want:
+- true/false typed values
+- or text values like yes/no
+
+A19) typed booleans where possible sound good for ease of stat derivation, though to avoid user input error, perhaps a selection input would be best.
+
+F. Event links
+
+Q20) Do you want links to be a general-purpose system with link types like:
+- resulted_in
+- caused_by
+- assisted_by
+- created_shot
+- preceded_by
+- related
+
+
+Q21) Or do you want a more football-specific link vocabulary from the start, such as:
+- created_shot
+- assist
+- resulted_in_goal
+- resulted_in_save
+- resulted_in_card
+- rebound_from
+
+A20/A21) I'm in favour of football-specific link types if they will be clearer and easier to derive from.
+
+Q22) When a pass leads to a shot, do you want the admin to manually create the link each time, or should the system later help automate some of that?
+
+A22) I imagine that having the system automate event links will be difficult, so let's hold off on that until a later version of the entire app.
+
+G. Admin workflow and usability
+
+Q23) When entering events post match, what is the expected admin workflow?
+- enter full timeline minute by minute from notes/video
+- enter just selected events of interest
+- sometimes detailed, sometimes lightweight depending on the match
+
+A23) It will depend on whether there is access to notes/video. If there is, then the admin will be able to enter a full timeline minute by minute using the resource. When there are no notes or video, the admin should be able to input just selected events (and there should be a note on the Matches page stating that full in-depth statistics are not available for this Match). Perhaps when the admin edits the Match Fixture to add the Match Result, they can select whether a full timeline of match events will be added or whether just a select number of key events will be included (goals / assists, cards, substitutions). When it is selected that only key events will be inputted, some statistics will still be able to be derived, but there should be a way for the admin to optionally input statistics for each player (like total shots, total shots on target, total shots off target, total blocks, corners taken, etc.), as these may have been tallied at the game by a coaching staff member. Please let me know if what I have described makes sense.
+
+Q24) For your club’s real-world use, do you expect admins to log:
+- every pass and duel
+- only key passes, shots, defensive actions, cards, substitutions, and notable ball progression
+- something in between
+
+A24) As I said in my answer to Q23, it will likely be one way or the other. If the admin has access to video footage and will log every match event into the timeline. If the admin does not have access to video footage, then only key match events will be inputted, and player statistics from the game should be able to be optional inputted, as described above.
+
+
+Q25) Would you like the event entry UI to eventually support:
+- “Add shot”
+- “Add pass”
+- “Add substitution”
+as task-specific forms, even if they all map to the same underlying event tables?
+
+A25) Yes, I imagine that admins will manage event entry through a user friendly UI, rather than the Django Administration, with UI that supports the entry of match events, like "add shot", "add pass", "add substitution", "begin match", "start extra time", "end half", "end match", etc. even if they all map to the same underlying event tables. This should make the manual entry much easier than one generic form.
+
+
+
+H. Validation strictness
+
+Q26) Should the system allow an event to be saved in an incomplete draft state, or should it reject incomplete semantic structures immediately?
+
+Examples:
+- shot without actor
+- substitution without subbed_on
+- card without receiver
+
+A26) No, it should not. Though it should be able to allocate an "Unknown" actor or recipient for instances where the admin is unable to determine which player is involved. This should still allow for accurate team statistics to be derived, even if it means that player statistics may not be completely accurate. I think this is a smart option to have.
+
+Q27) Do you want validation rules to depend on the event type strictly from day one, or should we phase them in gradually?
+
+A27) As you have recommended, it is good to phase them in gradually, but enforce the obvious high-value rules early.
+
+I. Spatial data
+
+Q28) For now, should location be:
+- optional for all event types
+- but especially intended for passes, carries, dribbles, shots
+
+A28) Yes, location should be optional, but intended for passes, carries, dribbles, shots.
+
+Q29) For a saved shot, do you want:
+- just the shot location
+- shot start plus shot end
+- and possibly separate save location later
+
+A29) I want, the location that the shot was taken from, the location that the shot is targeted towards, and I imagine that the shot being saved will either be a qualifier or a linked event, similar to if the shot is a goal. For where the shot is targeted towards, if it is on target it will be left/centre/right and upper_half/lower_half, if it is off target it will either hit a post or crossbar, be wide of a post, and/or above the crossbar. 
+
+Q30) When the pitch widget is built later, do you want:
+- simple click for start location only
+- click for both start and end points where relevant
+- auto-preview on a pitch after manual coordinate entry
+
+A30) I want to be able to click for both start and end points where relevant.
+
+J. Stats derivation philosophy
+
+Q31) Do you want all player and team stats to be derived solely from event data, with no manual stat entry except perhaps rare corrections?
+
+A31) If the admin is add a full timeline of match events, then yes, the player and team stats should be derived from the event data with no manual entry except rare corrections. However, if the admin is only adding key match events, then the admin should be able to optionally, manually add player and team stats that have been collected, as described above.
+
+Q32) If a correction is needed, should the admin:
+- edit the event log itself
+- or manually override a derived stat row
+
+A32) As you have recommended, corrections should happen by editing the event log, not by overriding derived stats. Unless the admin is not inputting a full timeline of match events and has selected the option to add key match events only.
+
+
+As a final note, if we need to edit the Match model to implement a new schema, I would like to add a Player of the Match selection to the Match Result section. 
+
+
+1. Pass and restart modelling
+Q) Do you agree with this recommendation:
+- use pass as the main event type
+- use qualifiers for:
+          - pass_type such as cross / through_ball / long_ball / short / long_pass
+          - restart_type such as corner / free_kick / goal_kick / throw_in / penalty
+- do not separately log restart_taken when the same action is already a pass or shot
+
+A) Yes I do. Although, from the full list of pass_type options you provided earlier (short, long_pass, long_ball, through_ball, cross, cutback, switch), it is important to note that a pass can be multiple types. For instance, a cutback can also be short, a through_ball can also be a long_pass, a long_ball can also be a long_pass. Penalty and free_kick are also listed in restart_type, these can also be shots, so there will need to be a restart_type qualifier for the shot event too. I also imagine that the outcome (successful or unsuccessful) and participants (by Player A to Player B) will be included in the event.
+
+2. Goal modelling
+Q) Do you agree with this recommendation:
+- normal goals are shot events with outcome scored
+- own_goal remains its own event type
+
+A) Yes, I agree.
+
+
+3. Duel modelling
+Q) Do you agree with this recommendation:
+- do not make ground_duel a primary manually entered event
+- derive ground-duel outcomes from dribbles, tackles, fouls, and related linked events
+- optionally keep aerial_duel as an explicit event type
+
+A) Yes, I agree. Although, a ground duel can also be credited for a loose ball challenge and shielding, as well as tackles and dribbles. So perhaps those actions will need to be added. Additionally, an event type has been included for recoveries, even though recoveries are a consequence of interceptions, tackles, loose ball pickups and goalkeeper actions like claiming crosses or catching a shot. Does this mean that a qualifier should be used to denote if an event is a recovery, rather than a separate recovery event? And then recoveries statistics are derived from the events which have been denoted with that qualifier?
+
+4. Side modelling
+Q) Do you agree with this recommendation:
+- each event stores team_side = club/opponent/neutral
+- MatchEvent should not rely on the current club-only team foreign key as its main side marker
+
+A) Yes, I agree. Each event should store team_side = club/opponent/neutral
+
+5. Opponent lineups
+Q) Do you want me to treat this as a planned near-term addition:
+- add OpponentLineupEntry
+- event participants can later reference it
+- unknown opponent participants can still be represented
+
+A) Yes, OpponentLineupEntry should be added as a model to the Opponents app so that event participants can later reference it. Unknown opponent participants should still be represented by something like "Unknown #0" (as should unknown club participants).
+
+6. Player of the Match
+Q) Should Player of the Match be:
+- selectable only from the club lineup
+- or potentially from either side later
+
+A) The Player of the Match should only be selectable from the club lineup, it will never be selected from the opponent team.
+
+
+
+
+
+
+My recommendation doe recoveries:
+
+Replace the broad idea of recovery with this:
+- keep derived recoveries from actions like tackle, interception, claim, save, sweep, etc. when possession is secured
+- add a specific event type for cases where possession is won without one of those clearer actions
+
+I recommend calling that event:
+- ball_recovery
+
+This would cover things like:
+- loose ball pickup
+- second ball collection
+- regaining possession after chaos
+- collecting an unclaimed ball
+
+
+
+sweep? and distribution? are these goalkeeper actions? are they not already accounted for through the other events like ball_recovery, clearance and pass?
+
+I would like for "big_chance" to be added as a qualifier to a shot as a yes/no Boolean choice (similar to the progressive option for the pass event). A "big_chance" in soccer is a scoring opportunity where a player is reasonably expected to score, typically involving a one-on-one with the goalkeeper, a close-range shot, or a penalty kick. It should be noted that this is different from "chance_created" that will be derived.
+
+
+
+
+1. Recovery modelling
+Q) Do you agree with this recommendation:
+- remove the vague recovery event type
+- add ball_recovery as the explicit event for loose-ball or second-ball possession gains
+- derive recovery-related stats from:
+	- ball_recovery
+	- successful tackles/interceptions with possession won
+	- goalkeeper claims or similar actions where possession is secured
+
+A) I agree with the recommendation to remove the vague recovery event type and add ball_recovery as the explicit event for loose-ball or second-ball posession gains. With recovery-related stats then being derived from; ball_recovery, successful tackles/interceptions with possession won, and goalkeeper claims or similar actions where possession is secured.
+
+2. Aerial duel modelling
+Q) Do you want:
+- aerial_duel as a dedicated top-level event type
+- or one duel event type with qualifier duel_type = aerial
+
+A) I agree with your recommendation to keep aerial_duel as a dedicated event type for now.
+
+
+I also have a question about the core event types listed. "sweep" and "distribution" have been listed, though I am unsure what these are, and would like to clarify what they are before confirming them as core event types. The rest of the core event types look good to me.
+
+Finally, I would like for "big_chance" to be added as a qualifier to a shot. This can be achieved through a simple yes/no Boolean choice (similar to the progressive option for a pass event). A "big_chance" in soccer is a scoring opportunity where a player is reasonably expected to score, typically involving a one-on-one with the goalkeeper, a close-range shot, or a penalty kick. It should be noted that this is different from the "chance_created" stat that will be derived as "assists" + "key_passes".
+
+1. Do you agree that we should add a new core event type:
+- position_change
+
+A) I agree.
+
+2. Do you agree that substitution events should use:
+- participants: subbed_off, subbed_on
+- qualifier: subbed_on_position
+- optional qualifier: subbed_off_position
+
+A) I agree
+
+3. Do you agree that position change events should use:
+- participant: actor
+- qualifiers: position_from, position_to
+
+A) I agree, though presumably the position_from qualifier can be optional as it will already be known.
+
+4. When a substitution happens, should the system assume by default that:
+- the incoming player replaces the outgoing player in the same position unless the admin explicitly sets a different subbed_on_position?
+
+A) Yes, it is safe to make that assumption. I agree with your recommendation.
+
+5. For formation reporting, do you want us to aim for:
+- macro formation only at first, such as 4-4-2
+- or both macro formation and exact position snapshot support in the derivation design from the start
+
+A) I would like to derive both, so that the detailed exact position snapshots can be used later in the UI.

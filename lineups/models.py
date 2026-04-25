@@ -113,6 +113,17 @@ class LineupEntry(models.Model):
         if match_season_id and registration_season_id and match_season_id != registration_season_id:
             errors["match"] = "Selected registration must belong to the same season as the match."
 
+        # Starters must have an initial position so the replay engine can
+        # derive the kickoff formation and initial on-pitch position state.
+        #
+        # Substitutes are allowed to have a blank position here, because their
+        # actual entry position can later be captured through the
+        # `subbed_on_position` event qualifier when they come onto the pitch.
+        if self.role == LineupRoleChoices.STARTER and not self.position_label:
+            errors["position_label"] = (
+                "Starter lineup entries must include an initial position label."
+            )
+
         if errors:
             raise ValidationError(errors)
 
