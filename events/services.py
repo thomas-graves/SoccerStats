@@ -14,6 +14,8 @@ These helpers do not touch the database directly.
 
 from collections import Counter
 
+from lineups.models import LineupEntry, LineupRoleChoices
+
 
 # Position groupings used for formation derivation.
 #
@@ -250,4 +252,48 @@ def apply_position_change(
     new_state = dict(position_state)
     new_state[actor_key] = position_to
     return new_state
+
+
+def build_initial_club_position_state(match) -> dict[int, str]:
+    """
+    Build the initial on-pitch club position state for a match from lineup entries.
+
+    This uses only starter lineup entries, because substitutes begin on the bench
+    and only enter the on-pitch state later through substitution events.
+
+    The returned mapping uses LineupEntry primary keys as the participant keys.
+    This keeps the replay layer aligned to match-context entities rather than
+    raw Player or Registration identifiers.
+
+    Example return value:
+        {
+            11: "GK",
+            12: "CB",
+            13: "CB",
+            14: "RB",
+            15: "LB",
+            ...
+        }
+
+    Notes:
+    - Starter lineup entries are expected to already have non-blank position labels.
+      That is enforced by LineupEntry.clean().
+    - The ordering comes from the LineupEntry model ordering plus the explicit
+      query ordering used below, which gives a stable initial exact snapshot.
+    """
+    starter_entries = (
+        LineupEntry.objects.filter(
+            match=match,
+            role=LineupRoleChoices.STARTER,
+        )
+        .exclude(position_label="")
+        .order_by("sort_order", "id")
+    )
+
+    entries = [
+        (lineup_entry.pk, lineup_entry.position_label)
+        for lineup_entry in starter_entries
+    ]
+
+    return build_position_state(entries)
 
